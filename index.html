@@ -783,8 +783,12 @@ body {
       <input type="date" id="filter-end">
     </div>
     <div class="total-card">
-      <div class="total-label">기간 지출 합계</div>
+      <div class="total-label">기간 지출 합계 (저금 제외)</div>
       <div class="total-amount" id="list-total">0원</div>
+      <div id="list-saving-row" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid rgba(0,0,0,0.08); display:flex; justify-content:space-between; font-size:0.9em; color:#888;">
+        <span>💰 저금 별도</span>
+        <span id="list-saving" style="font-weight:600;">0원</span>
+      </div>
     </div>
     <div class="entry-list" id="entry-list"></div>
     <div class="action-row">
@@ -1343,8 +1347,11 @@ function thisMonthStr() {
 function updateSummary() {
   const entries = getEntries();
   const yyyymm = thisMonthStr();
-  const monthTotal = entries.filter(e => e.date.startsWith(yyyymm)).reduce((sum, e) => sum + e.amount, 0);
-  document.getElementById('header-summary').textContent = `이번 달 지출: ${monthTotal.toLocaleString()}원`;
+  const monthEntries = entries.filter(e => e.date.startsWith(yyyymm));
+  const monthExpense = monthEntries
+    .filter(e => !SAVING_CATEGORIES.includes(e.category))
+    .reduce((sum, e) => sum + e.amount, 0);
+  document.getElementById('header-summary').textContent = `이번 달 지출: ${monthExpense.toLocaleString()}원`;
   
   const incomes = getIncomes();
   const incomeTotal = incomes.filter(e => e.date.startsWith(yyyymm)).reduce((sum, e) => sum + e.amount, 0);
@@ -1401,8 +1408,20 @@ function renderList() {
   
   filtered.sort((a,b) => b.date.localeCompare(a.date) || b.id - a.id);
   
-  const total = filtered.reduce((sum,e) => sum + e.amount, 0);
-  document.getElementById('list-total').textContent = `${total.toLocaleString()}원`;
+  const expenseTotal = filtered
+    .filter(e => !SAVING_CATEGORIES.includes(e.category))
+    .reduce((sum,e) => sum + e.amount, 0);
+  const savingTotal = filtered
+    .filter(e => SAVING_CATEGORIES.includes(e.category))
+    .reduce((sum,e) => sum + e.amount, 0);
+  document.getElementById('list-total').textContent = `${expenseTotal.toLocaleString()}원`;
+  const savingRow = document.getElementById('list-saving-row');
+  if (savingTotal > 0) {
+    savingRow.style.display = 'flex';
+    document.getElementById('list-saving').textContent = `${savingTotal.toLocaleString()}원`;
+  } else {
+    savingRow.style.display = 'none';
+  }
   
   const list = document.getElementById('entry-list');
   if (filtered.length === 0) {
