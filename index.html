@@ -2154,17 +2154,19 @@ function generatePrompt() {
     const incomes = getIncomes();
     const fixedIds = getFixedEntryIds();
     
-    const todayEntries = entries.filter(e => e.date === today && !fixedIds.has(e.id));
+    const todayVariable = entries.filter(e => e.date === today && !fixedIds.has(e.id) && !SAVING_CATEGORIES.includes(e.category));
+    const todaySaving = entries.filter(e => e.date === today && !fixedIds.has(e.id) && SAVING_CATEGORIES.includes(e.category));
     const todayFixed = entries.filter(e => e.date === today && fixedIds.has(e.id));
     const todayIncomes = incomes.filter(e => e.date === today);
     const monthEntries = entries.filter(e => e.date.startsWith(yyyymm) && !fixedIds.has(e.id));
     const monthFixedEntries = entries.filter(e => e.date.startsWith(yyyymm) && fixedIds.has(e.id));
     
     const todayByCat = {};
-    todayEntries.forEach(e => {
+    todayVariable.forEach(e => {
       todayByCat[e.category] = (todayByCat[e.category] || 0) + e.amount;
     });
     const todayTotal = Object.values(todayByCat).reduce((a,b)=>a+b, 0);
+    const todaySavingTotal = todaySaving.reduce((s,e)=>s+e.amount, 0);
     const todayFixedTotal = todayFixed.reduce((s,e)=>s+e.amount, 0);
     const todayIncomeTotal = todayIncomes.reduce((sum,e)=>sum+e.amount, 0);
     
@@ -2193,6 +2195,12 @@ function generatePrompt() {
     } else {
       Object.entries(todayByCat).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
         prompt += `- ${cat}: ${amt.toLocaleString()}원\n`;
+      });
+    }
+    if (todaySavingTotal > 0) {
+      prompt += `\n[오늘 저금: ${todaySavingTotal.toLocaleString()}원]\n`;
+      todaySaving.forEach(e => {
+        prompt += `- ${e.category}${e.sub ? ' · ' + e.sub : ''}: ${e.amount.toLocaleString()}원 (${e.memo || ''})\n`;
       });
     }
     if (todayFixedTotal > 0) {
