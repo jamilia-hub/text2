@@ -1672,10 +1672,26 @@ function renderStats() {
   
   const list = document.getElementById('stats-list');
   const allCats = CATEGORIES.map(c => c.name);
+  
+  // 저금 카테고리는 자산 페이스를 동적 예산으로 사용
+  let monthlyPace = 0;
+  try {
+    const assetData = getAssets();
+    const yyyymm2 = thisMonthStr();
+    const currSnapshot = assetData.snapshots[yyyymm2] || {};
+    const currTotal = assetData.items.reduce((sum, item) => 
+      sum + (currSnapshot[item.id] || 0), 0);
+    const nowDate = new Date();
+    const targetEnd = new Date(nowDate.getFullYear(), 11, 31);
+    const monthsLeft = Math.max(1, (targetEnd.getFullYear() - nowDate.getFullYear()) * 12 + (targetEnd.getMonth() - nowDate.getMonth()) + 1);
+    const remaining = TARGET_AMOUNT - currTotal;
+    monthlyPace = remaining > 0 ? Math.ceil(remaining / monthsLeft) : 0;
+  } catch {}
+  
   const cardData = allCats.map(cat => ({
     cat,
     amount: byCategory[cat] || 0,
-    budget: BUDGETS[cat] || 0
+    budget: cat === '저금' && monthlyPace > 0 ? monthlyPace : (BUDGETS[cat] || 0)
   }));
   
   cardData.sort((a,b) => {
