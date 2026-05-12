@@ -801,14 +801,18 @@ body {
     <div class="savings-card">
       <h3>이번 달 저축 가능액</h3>
       <div class="savings-row"><span class="label">수입</span><span class="value" id="stat-income">0원</span></div>
-      <div class="savings-row"><span class="label">지출 (저금 제외)</span><span class="value" id="stat-expense">0원</span></div>
+      <div class="savings-row"><span class="label">지출 (변동+고정)</span><span class="value" id="stat-expense">0원</span></div>
       <div class="savings-row highlight"><span class="label">저축 가능</span><span class="value" id="stat-savings">0원</span></div>
+    </div>
+    <div class="savings-summary">
+      <div class="label">🔒 이번 달 고정지출 결제</div>
+      <div class="amount" id="stat-fixed-total" style="color:#8a7f72;">0원</div>
     </div>
     <div class="savings-summary">
       <div class="label">💰 이번 달 저금 (자산 증식)</div>
       <div class="amount" id="stat-saving-total">0원</div>
     </div>
-    <div class="section-title">카테고리별 (예산 대비)</div>
+    <div class="section-title">카테고리별 변동지출 (예산 대비)</div>
     <div id="stats-list"></div>
     <div class="section-title" style="margin-top:20px;">거래처별 수입</div>
     <div id="source-stats-list"></div>
@@ -1590,32 +1594,46 @@ function renderStats() {
   const yyyymm = thisMonthStr();
   const thisMonth = entries.filter(e => e.date.startsWith(yyyymm));
   const thisMonthIncome = incomes.filter(e => e.date.startsWith(yyyymm));
-  
+
+  // 변동 / 고정 / 저금 분리
+  const variable = thisMonth.filter(e => !e.fixed && !SAVING_CATEGORIES.includes(e.category));
+  const fixed = thisMonth.filter(e => e.fixed);
+  const savings = thisMonth.filter(e => SAVING_CATEGORIES.includes(e.category));
+
+  // 카테고리별 집계는 변동만
   const byCategory = {};
-  thisMonth.forEach(e => {
+  variable.forEach(e => {
     byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
   });
-  
-  // 저금 카테고리는 별도 합계
-  const savingTotal = SAVING_CATEGORIES.reduce((sum, cat) => sum + (byCategory[cat] || 0), 0);
-  const totalExpense = Object.entries(byCategory)
-    .filter(([cat]) => !SAVING_CATEGORIES.includes(cat))
-    .reduce((sum, [, amt]) => sum + amt, 0);
+
+  const variableTotal = variable.reduce((s,e) => s + e.amount, 0);
+  const fixedTotal = fixed.reduce((s,e) => s + e.amount, 0);
+  const savingTotal = savings.reduce((s,e) => s + e.amount, 0);
   const totalIncome = thisMonthIncome.reduce((sum,e) => sum + e.amount, 0);
-  const savings = totalIncome - totalExpense;
+
+  // 저축 가능액 = 수입 - 변동 - 고정 (저금은 자산이동이라 제외)
+  const realExpense = variableTotal + fixedTotal;
+  const possibleSavings = totalIncome - realExpense;
   
   document.getElementById('stat-income').textContent = `${totalIncome.toLocaleString()}원`;
-  document.getElementById('stat-expense').textContent = `${totalExpense.toLocaleString()}원`;
-  document.getElementById('stat-savings').textContent = `${savings.toLocaleString()}원`;
-  
+  document.getElementById('stat-expense').textContent = `${realExpense.toLocaleString()}원`;
+  document.getElementById('stat-savings').textContent = `${possibleSavings.toLocaleString()}원`;
+
   // 저금 합계 별도 표시
   const savingEl = document.getElementById('stat-saving-total');
   if (savingEl) {
     savingEl.textContent = `${savingTotal.toLocaleString()}원`;
   }
-  
+
+  // 고정지출 카드 표시
+  const fixedEl = document.getElementById('stat-fixed-total');
+  if (fixedEl) {
+    fixedEl.textContent = `${fixedTotal.toLocaleString()}원`;
+  }
+
   const list = document.getElementById('stats-list');
-  const allCats = CATEGORIES.map(c => c.name);
+  // 저금은 자산 탭에서 보니까 카테고리별 통계에서 제외
+  const allCats = CATEGORIES.filter(c => !SAVING_CATEGORIES.includes(c.name)).map(c => c.name);
   const cardData = allCats.map(cat => ({
     cat,
     amount: byCategory[cat] || 0,
@@ -1637,11 +1655,11 @@ function renderStats() {
     }
     const barWidth = pct !== null ? Math.min(pct, 100) : (d.amount > 0 ? 50 : 0);
 
-    // 서브 카테고리별 집계
+    // 서브 카테고리별 집계 (변동만)
     let subBreakdown = '';
     if (CATEGORY_SUBS[d.cat] && d.amount > 0) {
       const bySub = {};
-      thisMonth.filter(e => e.category === d.cat).forEach(e => {
+      variable.filter(e => e.category === d.cat).forEach(e => {
         const sub = e.sub || '미분류';
         bySub[sub] = (bySub[sub] || 0) + e.amount;
       });
@@ -1665,7 +1683,7 @@ function renderStats() {
         ${subBreakdown}
       </div>
     `;
-  }).join('') || '<div class="empty-state">이번 달 기록이 없습니다</div>';
+  }).join('') || '<div class="empty-state">이번 달 변동지출 기록이 없습니다</div>';
   
   // 거래처별 수입 통계
   const sourceStats = {};
@@ -1803,7 +1821,8 @@ function confirmFixedCheck() {
     date,
     category: item.category,
     amount,
-    memo: item.name + ' (고정)'
+    memo: item.name + ' (고정)',
+    fixed: true
   };
   if (item.sub) entry.sub = item.sub;
   entries.push(entry);
@@ -1898,27 +1917,48 @@ function getCurrentMonthData() {
   const yyyymm = thisMonthStr();
   const thisMonth = entries.filter(e => e.date.startsWith(yyyymm));
   const thisMonthIncome = incomes.filter(e => e.date.startsWith(yyyymm));
-  
+
+  // 변동/고정/저금 분리
+  const variable = thisMonth.filter(e => !e.fixed && !SAVING_CATEGORIES.includes(e.category));
+  const fixed = thisMonth.filter(e => e.fixed);
+  const saving = thisMonth.filter(e => SAVING_CATEGORIES.includes(e.category));
+
+  // 카테고리별 (변동만)
   const byCategory = {};
-  const bySub = {}; // {카테고리: {서브: 금액}}
-  thisMonth.forEach(e => {
+  const bySub = {};
+  variable.forEach(e => {
     byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
     if (e.sub) {
       if (!bySub[e.category]) bySub[e.category] = {};
       bySub[e.category][e.sub] = (bySub[e.category][e.sub] || 0) + e.amount;
     }
   });
-  
+
+  // 저금 서브 집계
+  const savingBySub = {};
+  saving.forEach(e => {
+    const sub = e.sub || '미분류';
+    savingBySub[sub] = (savingBySub[sub] || 0) + e.amount;
+  });
+
   const incomeByCategory = {};
   thisMonthIncome.forEach(e => {
     incomeByCategory[e.category] = (incomeByCategory[e.category] || 0) + e.amount;
   });
-  
-  return { 
-    entries: thisMonth, 
-    byCategory,
-    bySub,
-    total: Object.values(byCategory).reduce((a,b)=>a+b,0),
+
+  const variableTotal = variable.reduce((s,e) => s + e.amount, 0);
+  const fixedTotal = fixed.reduce((s,e) => s + e.amount, 0);
+  const savingTotal = saving.reduce((s,e) => s + e.amount, 0);
+
+  return {
+    entries: thisMonth,
+    byCategory,           // 변동 카테고리별
+    bySub,                // 변동 서브별
+    savingBySub,          // 저금 서브별
+    variableTotal,        // 변동지출 합계
+    fixedTotal,           // 고정지출 합계 (결제된 것만)
+    savingTotal,          // 저금 합계
+    total: variableTotal + fixedTotal + savingTotal,  // 전체 합계
     income: thisMonthIncome,
     incomeByCategory,
     incomeTotal: Object.values(incomeByCategory).reduce((a,b)=>a+b,0)
@@ -1983,15 +2023,28 @@ function getThisWeekData() {
 
   const thisWeek = entries.filter(e => e.date >= startStr && e.date <= endStr);
   const thisWeekIncome = incomes.filter(e => e.date >= startStr && e.date <= endStr);
+
+  // 변동/고정/저금 분리
+  const variable = thisWeek.filter(e => !e.fixed && !SAVING_CATEGORIES.includes(e.category));
+  const fixed = thisWeek.filter(e => e.fixed);
+  const saving = thisWeek.filter(e => SAVING_CATEGORIES.includes(e.category));
+
   const byCategory = {};
-  thisWeek.forEach(e => {
+  variable.forEach(e => {
     byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
   });
 
+  const variableTotal = variable.reduce((s,e) => s + e.amount, 0);
+  const fixedTotal = fixed.reduce((s,e) => s + e.amount, 0);
+  const savingTotal = saving.reduce((s,e) => s + e.amount, 0);
+
   return {
     entries: thisWeek,
-    byCategory,
-    total: Object.values(byCategory).reduce((a,b)=>a+b,0),
+    byCategory,           // 변동 카테고리별
+    variableTotal,
+    fixedTotal,
+    savingTotal,
+    total: variableTotal + fixedTotal + savingTotal,
     startDate: startStr,
     endDate: endStr,
     incomeTotal: thisWeekIncome.reduce((sum,e)=>sum+e.amount,0)
@@ -2021,49 +2074,48 @@ function generatePrompt() {
 
   if (consultType === 'daily') {
     const today = todayStr();
-    const yyyymm = thisMonthStr();
     const entries = getEntries();
     const incomes = getIncomes();
-    
+    const month = getCurrentMonthData();
+
     const todayEntries = entries.filter(e => e.date === today);
     const todayIncomes = incomes.filter(e => e.date === today);
-    const monthEntries = entries.filter(e => e.date.startsWith(yyyymm));
-    
+
+    // 오늘 지출 변동/고정 분리
+    const todayVariable = todayEntries.filter(e => !e.fixed && !SAVING_CATEGORIES.includes(e.category));
+    const todayFixed = todayEntries.filter(e => e.fixed);
+    const todaySaving = todayEntries.filter(e => SAVING_CATEGORIES.includes(e.category));
+
     const todayByCat = {};
-    todayEntries.forEach(e => {
+    todayVariable.forEach(e => {
       todayByCat[e.category] = (todayByCat[e.category] || 0) + e.amount;
     });
-    const todayTotal = Object.values(todayByCat).reduce((a,b)=>a+b, 0);
+    const todayVarTotal = todayVariable.reduce((s,e) => s + e.amount, 0);
+    const todayFixedTotal = todayFixed.reduce((s,e) => s + e.amount, 0);
+    const todaySavingTotal = todaySaving.reduce((s,e) => s + e.amount, 0);
     const todayIncomeTotal = todayIncomes.reduce((sum,e)=>sum+e.amount, 0);
-    
-    // 이번 달 누적 (저금 제외)
-    const monthByCat = {};
-    monthEntries.forEach(e => {
-      monthByCat[e.category] = (monthByCat[e.category] || 0) + e.amount;
-    });
-    const monthExpense = Object.entries(monthByCat)
-      .filter(([cat]) => !SAVING_CATEGORIES.includes(cat))
-      .reduce((sum, [, amt]) => sum + amt, 0);
-    const monthSaving = SAVING_CATEGORIES.reduce((sum, cat) => sum + (monthByCat[cat] || 0), 0);
-    
+
+    // 변동지출 예산 합계 (저금 제외)
     const monthBudgetTotal = Object.entries(BUDGETS)
       .filter(([cat]) => !SAVING_CATEGORIES.includes(cat))
       .reduce((sum, [, amt]) => sum + amt, 0);
-    const pct = monthBudgetTotal > 0 ? Math.round(monthExpense / monthBudgetTotal * 100) : 0;
-    
+    const pct = monthBudgetTotal > 0 ? Math.round(month.variableTotal / monthBudgetTotal * 100) : 0;
+
     prompt = `[쿠키 가계부 - 하루 결산]\n\n`;
     prompt += `오늘 날짜: ${today}\n\n`;
-    
-    prompt += `[오늘 지출 합계: ${todayTotal.toLocaleString()}원]\n`;
+
+    prompt += `[오늘 변동지출: ${todayVarTotal.toLocaleString()}원]\n`;
     if (Object.keys(todayByCat).length === 0) {
-      prompt += `- 지출 없음\n`;
+      prompt += `- 변동 지출 없음\n`;
     } else {
       Object.entries(todayByCat).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
         prompt += `- ${cat}: ${amt.toLocaleString()}원\n`;
       });
     }
+    if (todayFixedTotal > 0) prompt += `- 오늘 고정지출 결제: ${todayFixedTotal.toLocaleString()}원\n`;
+    if (todaySavingTotal > 0) prompt += `- 오늘 저금: ${todaySavingTotal.toLocaleString()}원\n`;
     prompt += `\n`;
-    
+
     if (todayIncomeTotal > 0) {
       prompt += `[오늘 수입: ${todayIncomeTotal.toLocaleString()}원]\n`;
       todayIncomes.forEach(e => {
@@ -2071,39 +2123,48 @@ function generatePrompt() {
       });
       prompt += `\n`;
     }
-    
+
     prompt += `[이번 달 누적]\n`;
-    prompt += `- 지출 (저금 제외): ${monthExpense.toLocaleString()} / ${monthBudgetTotal.toLocaleString()} (${pct}%)\n`;
-    prompt += `- 저금: ${monthSaving.toLocaleString()}원\n`;
+    prompt += `- 변동지출: ${month.variableTotal.toLocaleString()} / ${monthBudgetTotal.toLocaleString()} (${pct}%)\n`;
+    prompt += `- 고정지출 결제: ${month.fixedTotal.toLocaleString()}원\n`;
+    prompt += `- 저금: ${month.savingTotal.toLocaleString()}원\n`;
     prompt += `\n`;
-    
+
     prompt += `오늘 지출이 이번 달 페이스 대비 어떤지 평가해줘. 잘했으면 잘했다고, 조절 필요하면 어디 줄여야 할지 짧고 명확하게 코멘트 부탁해.`;
   }
   else if (consultType === 'weekly') {
     const week = getThisWeekData();
     const month = getCurrentMonthData();
     const asset = getAssetSummaryForPrompt();
-    
+
     prompt = `[쿠키 가계부 - 주간 결산]\n\n`;
     prompt += `지난 7일 (${week.startDate} ~ ${week.endDate}):\n`;
     if (Object.keys(week.byCategory).length === 0) {
-      prompt += `- 지출 기록 없음\n`;
+      prompt += `- 변동지출 기록 없음\n`;
     } else {
       Object.entries(week.byCategory).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
         prompt += `- ${cat}: ${amt.toLocaleString()}원\n`;
       });
-      prompt += `- 주 지출 합계: ${week.total.toLocaleString()}원\n`;
+      prompt += `- 주 변동지출 합계: ${week.variableTotal.toLocaleString()}원\n`;
     }
+    if (week.fixedTotal > 0) prompt += `- 주 고정지출 결제: ${week.fixedTotal.toLocaleString()}원\n`;
+    if (week.savingTotal > 0) prompt += `- 주 저금: ${week.savingTotal.toLocaleString()}원\n`;
     if (week.incomeTotal > 0) prompt += `- 주 수입: ${week.incomeTotal.toLocaleString()}원\n`;
-    
-    prompt += `\n이번 달 누적 (예산 대비, 서브 포함):\n`;
-    Object.entries(month.byCategory).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
-      prompt += formatCatLine(cat, amt, month.bySub, true);
-    });
-    prompt += `- 월 지출 합계: ${month.total.toLocaleString()}원\n`;
+
+    prompt += `\n이번 달 누적 (변동지출, 예산 대비, 서브 포함):\n`;
+    if (Object.keys(month.byCategory).length === 0) {
+      prompt += `- 변동지출 기록 없음\n`;
+    } else {
+      Object.entries(month.byCategory).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
+        prompt += formatCatLine(cat, amt, month.bySub, true);
+      });
+      prompt += `- 월 변동지출 합계: ${month.variableTotal.toLocaleString()}원\n`;
+    }
+    prompt += `- 월 고정지출 결제: ${month.fixedTotal.toLocaleString()}원\n`;
+    prompt += `- 월 저금: ${month.savingTotal.toLocaleString()}원\n`;
     if (month.incomeTotal > 0) {
       prompt += `- 월 수입 합계: ${month.incomeTotal.toLocaleString()}원\n`;
-      prompt += `- 월 저축 가능: ${(month.incomeTotal - month.total).toLocaleString()}원\n`;
+      prompt += `- 월 저축 가능 (수입 - 변동 - 고정): ${(month.incomeTotal - month.variableTotal - month.fixedTotal).toLocaleString()}원\n`;
     }
 
     if (asset && asset.currTotal > 0) {
@@ -2112,40 +2173,52 @@ function generatePrompt() {
       prompt += `- 잔여 ${asset.monthsLeft}개월, 월 ${asset.monthlyNeed.toLocaleString()}원 페이스 필요\n`;
       if (asset.diff !== 0) prompt += `- 이번 달 자산 변화: ${asset.diff >= 0 ? '+' : ''}${asset.diff.toLocaleString()}원\n`;
     }
-    
+
     prompt += `\n이번 주 평가 + 다음 주 가이드 부탁. 메모리에 있는 자기관리 룰, 8000만원 목표, 자기 박대 패턴 다 고려해서 잔소리 + 조언 부탁해.`;
-    
+
   } else if (consultType === 'monthly') {
     const month = getCurrentMonthData();
     const asset = getAssetSummaryForPrompt();
     const fixed = getFixedSummaryForPrompt();
     const now = new Date();
-    
+
     prompt = `[쿠키 가계부 - ${now.getMonth()+1}월 마감]\n\n`;
-    prompt += `이번 달 카테고리별 (서브 포함):\n`;
+    prompt += `이번 달 변동지출 (예산 대비, 서브 포함):\n`;
     if (Object.keys(month.byCategory).length === 0) {
       prompt += `- 기록 없음\n`;
     } else {
       Object.entries(month.byCategory).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
         prompt += formatCatLine(cat, amt, month.bySub, true);
       });
-      prompt += `\n월 총 지출: ${month.total.toLocaleString()}원\n`;
+      prompt += `- 월 변동지출 합계: ${month.variableTotal.toLocaleString()}원\n`;
     }
-    
+
+    prompt += `\n고정지출 결제: ${month.fixedTotal.toLocaleString()}원 (${fixed.checkedCount}/${fixed.totalItems} 항목)`;
+    if (fixed.unchecked.length > 0 && fixed.unchecked.length <= 5) {
+      prompt += `\n- 미결: ${fixed.unchecked.join(', ')}`;
+    }
+    prompt += '\n';
+
+    if (month.savingTotal > 0) {
+      prompt += `\n저금 (자산 증식): ${month.savingTotal.toLocaleString()}원`;
+      if (Object.keys(month.savingBySub).length > 0) {
+        const subStr = Object.entries(month.savingBySub)
+          .sort((a,b) => b[1] - a[1])
+          .map(([s, a]) => `${s} ${a.toLocaleString()}`)
+          .join(' / ');
+        prompt += `  [${subStr}]`;
+      }
+      prompt += '\n';
+    }
+
     if (month.incomeTotal > 0) {
       prompt += `\n수입:\n`;
       Object.entries(month.incomeByCategory).forEach(([cat, amt]) => {
         prompt += `- ${cat}: ${amt.toLocaleString()}원\n`;
       });
       prompt += `- 월 총 수입: ${month.incomeTotal.toLocaleString()}원\n`;
-      prompt += `- 월 저축 가능: ${(month.incomeTotal - month.total).toLocaleString()}원\n`;
+      prompt += `- 월 저축 가능 (수입 - 변동 - 고정): ${(month.incomeTotal - month.variableTotal - month.fixedTotal).toLocaleString()}원\n`;
     }
-
-    prompt += `\n고정지출 진행: ${fixed.checkedCount}/${fixed.totalItems} 결제`;
-    if (fixed.unchecked.length > 0 && fixed.unchecked.length <= 5) {
-      prompt += ` (미결: ${fixed.unchecked.join(', ')})`;
-    }
-    prompt += '\n';
 
     if (asset) {
       prompt += `\n자산 진행률:\n`;
@@ -2154,23 +2227,28 @@ function generatePrompt() {
       prompt += `- 잔여 ${asset.monthsLeft}개월, 월 ${asset.monthlyNeed.toLocaleString()}원 페이스 필요\n`;
       if (asset.diff !== 0) prompt += `- 이번 달 실제 저축액: ${asset.diff >= 0 ? '+' : ''}${asset.diff.toLocaleString()}원\n`;
     }
-    
+
     prompt += `\n월간 마감 평가 부탁. 8000만원 목표 진행률 어떤지, 다음 달 조정할 부분 있는지, 자기관리 예산 한도 잘 지켰는지 점검 부탁해.`;
-    
+
   } else if (consultType === 'big') {
     const extra = document.getElementById('consult-extra').value.trim();
     if (!extra) { alert('뭐 사고 싶은지 적어주세요'); return; }
     const month = getCurrentMonthData();
     const asset = getAssetSummaryForPrompt();
-    
+
     prompt = `[쿠키 가계부 - 지출 상담]\n\n`;
     prompt += `사고 싶은 것: ${extra}\n\n`;
-    prompt += `이번 달 현재 상황 (서브 포함):\n`;
+    prompt += `이번 달 변동지출 (예산 대비, 서브 포함):\n`;
     Object.entries(month.byCategory).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
       prompt += formatCatLine(cat, amt, month.bySub, true);
     });
-    prompt += `- 월 지출: ${month.total.toLocaleString()}원\n`;
-    if (month.incomeTotal > 0) prompt += `- 월 수입: ${month.incomeTotal.toLocaleString()}원\n`;
+    prompt += `- 월 변동지출: ${month.variableTotal.toLocaleString()}원\n`;
+    prompt += `- 월 고정지출 결제: ${month.fixedTotal.toLocaleString()}원\n`;
+    prompt += `- 월 저금: ${month.savingTotal.toLocaleString()}원\n`;
+    if (month.incomeTotal > 0) {
+      prompt += `- 월 수입: ${month.incomeTotal.toLocaleString()}원\n`;
+      prompt += `- 월 저축 가능 (수입 - 변동 - 고정): ${(month.incomeTotal - month.variableTotal - month.fixedTotal).toLocaleString()}원\n`;
+    }
 
     if (asset) {
       prompt += `\n자산 진행률:\n`;
@@ -2179,22 +2257,22 @@ function generatePrompt() {
     }
 
     prompt += `\n이거 사도 될까? 자기 박대 vs 합리적 보상 vs 충동소비 어디에 해당하는지 솔직 평가 + 8000만원 목표 영향 분석 부탁해.`;
-    
+
   } else if (consultType === 'free') {
     const extra = document.getElementById('consult-extra').value.trim();
     if (!extra) { alert('질문을 적어주세요'); return; }
     const month = getCurrentMonthData();
     const asset = getAssetSummaryForPrompt();
-    
+
     prompt = `[쿠키 가계부 - 자유 질문]\n\n질문: ${extra}\n\n`;
     prompt += `참고 (이번 달 상황):\n`;
     if (Object.keys(month.byCategory).length === 0) {
-      prompt += `- 아직 기록 없음\n`;
+      prompt += `- 변동지출 기록 없음\n`;
     } else {
       Object.entries(month.byCategory).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
         prompt += formatCatLine(cat, amt, month.bySub, false);
       });
-      prompt += `- 지출 합계: ${month.total.toLocaleString()}원\n`;
+      prompt += `- 변동지출 합계: ${month.variableTotal.toLocaleString()}원\n`;
       if (month.incomeTotal > 0) prompt += `- 수입 합계: ${month.incomeTotal.toLocaleString()}원\n`;
     }
     if (asset && asset.currTotal > 0) {
@@ -2494,6 +2572,21 @@ function deleteAsset() {
 }
 
 // ===== 초기화 =====
+// 기존 데이터 마이그레이션: memo에 "(고정)" 들어간 entries → fixed:true 처리
+const FIXED_MIGRATION_KEY = 'cookie_budget_fixed_migrated_v1';
+if (!localStorage.getItem(FIXED_MIGRATION_KEY)) {
+  const entries = getEntries();
+  let changed = false;
+  entries.forEach(e => {
+    if (!e.fixed && e.memo && e.memo.includes('(고정)')) {
+      e.fixed = true;
+      changed = true;
+    }
+  });
+  if (changed) saveEntries(entries);
+  localStorage.setItem(FIXED_MIGRATION_KEY, 'true');
+}
+
 renderCategories();
 renderIncomeCategories();
 updateSummary();
