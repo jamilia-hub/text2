@@ -821,7 +821,7 @@ body {
   <!-- 자산 탭 -->
   <div id="tab-assets" class="tab-content" style="display:none;">
     <div class="goal-card">
-      <div class="goal-label">2026년 목표 (8000만 + 가방 250만)</div>
+      <div class="goal-label">2026년 목표 (전체: 8000만 + 가방 250만)</div>
       <div class="goal-progress">
         <span id="goal-current">0원</span>
         <span class="goal-target">/ 82,500,000원</span>
@@ -833,24 +833,32 @@ body {
       </div>
       <div class="goal-pace" id="goal-pace">잔여 8개월 / 월 페이스 계산 중</div>
     </div>
-    
+
+    <!-- 분류별 합계 카드 -->
+    <div class="savings-card" style="background: linear-gradient(135deg, #e8f0e0 0%, #f5f1ea 100%);">
+      <h3>💎 진짜 자산 (8000만 카운트)</h3>
+      <div class="savings-row"><span class="label">🟢 진짜 자산 합계</span><span class="value" id="asset-real-total" style="color:#5a8a5a; font-weight:700;">0원</span></div>
+      <div class="savings-row"><span class="label">🟡 목적성 적립 (쓸 돈)</span><span class="value" id="asset-purposed-total" style="color:#a8956c;">0원</span></div>
+      <div class="savings-row highlight"><span class="label">진짜 자산 진행률 (vs 8000만)</span><span class="value" id="asset-real-pct">0%</span></div>
+    </div>
+
     <div class="month-selector">
       <button onclick="changeAssetMonth(-1)">‹</button>
       <span id="asset-month-label">2026년 5월</span>
       <button onclick="changeAssetMonth(1)">›</button>
     </div>
-    
+
     <div class="savings-card">
-      <h3>이번 달 자산 변화</h3>
+      <h3>이번 달 자산 변화 (전체)</h3>
       <div class="savings-row"><span class="label">지난 달 합계</span><span class="value" id="asset-prev">0원</span></div>
       <div class="savings-row"><span class="label">이번 달 합계</span><span class="value" id="asset-curr">0원</span></div>
       <div class="savings-row highlight"><span class="label">실제 저축액</span><span class="value" id="asset-diff">0원</span></div>
     </div>
-    
+
     <div class="section-title">자산 항목</div>
     <div id="asset-list"></div>
     <button class="action-btn" onclick="openAssetModal()" style="margin-top:12px; padding: 14px;">+ 자산 항목 추가</button>
-    
+
     <div class="section-title" style="margin-top:20px;">월별 추이</div>
     <div id="asset-history"></div>
   </div>
@@ -941,8 +949,16 @@ body {
   <div class="modal">
     <h2 id="asset-modal-title">자산 항목 추가</h2>
     <div class="input-group">
-      <label>분류</label>
+      <label>분류 (통장 종류)</label>
       <div id="asset-type-buttons" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+    </div>
+    <div class="input-group">
+      <label>8000만 카운트 분류</label>
+      <div id="asset-classification-buttons" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+      <p style="font-size:11px; color:#8a7f72; margin-top:6px; line-height:1.4;">
+        🟢 진짜 자산: 정기예금·적금·주식·ISA 등 (8000만 카운트)<br>
+        🟡 목적성 적립: 시술비·재산세·가방시드 등 곧 쓸 돈
+      </p>
     </div>
     <div class="input-group">
       <label>항목명</label>
@@ -2325,9 +2341,15 @@ function closeConsultModal() {
 }
 
 // ===== 자산 관리 =====
-const ASSETS_KEY = 'cookie_budget_assets'; // {items: [{id, name, type}], snapshots: {yyyymm: {itemId: amount}}}
+const ASSETS_KEY = 'cookie_budget_assets'; // {items: [{id, name, type, classification}], snapshots: {yyyymm: {itemId: amount}}}
 const ASSET_TYPES = ['입출금', '정기예금', '적금', 'CMA', '주식', '기타'];
-const TARGET_AMOUNT = 82500000;
+// 자산 분류: real=진짜 자산(8000만 카운트), purposed=목적성 적립(쓸 돈, 카운트 X)
+const ASSET_CLASSIFICATIONS = {
+  'real': { label: '진짜 자산', icon: '🟢', desc: '8000만 카운트' },
+  'purposed': { label: '목적성 적립', icon: '🟡', desc: '쓸 돈, 카운트 X' }
+};
+const TARGET_AMOUNT = 82500000; // 전체 자산 목표 (가방 250만 미리 반영)
+const TARGET_REAL = 80000000;   // 진짜 자산만 목표 (옵션 A 인지용)
 
 let currentAssetMonth = null;
 let editingAssetId = null;
@@ -2364,20 +2386,28 @@ function getPrevMonth(yyyymm) {
 
 function renderAssets() {
   if (!currentAssetMonth) currentAssetMonth = thisMonthStr();
-  
+
   const data = getAssets();
   const [y, m] = currentAssetMonth.split('-');
   document.getElementById('asset-month-label').textContent = `${y}년 ${parseInt(m)}월`;
-  
+
   const currSnapshot = data.snapshots[currentAssetMonth] || {};
   const prevSnapshot = data.snapshots[getPrevMonth(currentAssetMonth)] || {};
-  
-  // 항목 리스트 렌더링
+
+  // 항목 리스트 렌더링 (분류 아이콘 포함, 분류별 그룹화)
   const list = document.getElementById('asset-list');
   if (data.items.length === 0) {
     list.innerHTML = '<div class="empty-state">자산 항목이 없습니다.<br>아래 버튼으로 추가하세요.</div>';
   } else {
-    list.innerHTML = data.items.map(item => {
+    // 진짜 자산 먼저, 목적성 적립 다음으로 정렬
+    const sortedItems = [...data.items].sort((a, b) => {
+      const ca = a.classification || 'real';
+      const cb = b.classification || 'real';
+      if (ca === cb) return 0;
+      return ca === 'real' ? -1 : 1;
+    });
+
+    list.innerHTML = sortedItems.map(item => {
       const amount = currSnapshot[item.id] !== undefined ? currSnapshot[item.id] : 0;
       const prevAmount = prevSnapshot[item.id] !== undefined ? prevSnapshot[item.id] : 0;
       const itemDiff = amount - prevAmount;
@@ -2387,10 +2417,12 @@ function renderAssets() {
         const sign = itemDiff > 0 ? '+' : '';
         changeHtml = `<span class="asset-change ${cls}">${sign}${itemDiff.toLocaleString()}</span>`;
       }
+      const cls = item.classification || 'real';
+      const icon = ASSET_CLASSIFICATIONS[cls]?.icon || '🟢';
       return `
         <div class="asset-item" onclick="editAsset('${item.id}')">
           <div class="asset-info">
-            <span class="asset-type">${item.type}</span>
+            <span class="asset-type">${icon} ${item.type}</span>
             <div class="asset-name">${item.name}</div>
           </div>
           <div class="asset-amount">${amount.toLocaleString()}원${changeHtml}</div>
@@ -2398,28 +2430,42 @@ function renderAssets() {
       `;
     }).join('');
   }
-  
-  // 합계 계산
-  const currTotal = data.items.reduce((sum, item) => 
+
+  // 전체 합계
+  const currTotal = data.items.reduce((sum, item) =>
     sum + (currSnapshot[item.id] !== undefined ? currSnapshot[item.id] : 0), 0);
-  const prevTotal = data.items.reduce((sum, item) => 
+  const prevTotal = data.items.reduce((sum, item) =>
     sum + (prevSnapshot[item.id] !== undefined ? prevSnapshot[item.id] : 0), 0);
   const diff = currTotal - prevTotal;
-  
+
+  // 분류별 합계 (이번 달 기준)
+  const realTotal = data.items
+    .filter(item => (item.classification || 'real') === 'real')
+    .reduce((sum, item) => sum + (currSnapshot[item.id] || 0), 0);
+  const purposedTotal = data.items
+    .filter(item => item.classification === 'purposed')
+    .reduce((sum, item) => sum + (currSnapshot[item.id] || 0), 0);
+
   document.getElementById('asset-prev').textContent = `${prevTotal.toLocaleString()}원`;
   document.getElementById('asset-curr').textContent = `${currTotal.toLocaleString()}원`;
   const diffEl = document.getElementById('asset-diff');
   diffEl.textContent = `${diff >= 0 ? '+' : ''}${diff.toLocaleString()}원`;
   diffEl.style.color = diff >= 0 ? '#6a9a6a' : '#c46060';
-  
-  // 8000만원 목표
+
+  // 분류별 카드 갱신
+  document.getElementById('asset-real-total').textContent = `${realTotal.toLocaleString()}원`;
+  document.getElementById('asset-purposed-total').textContent = `${purposedTotal.toLocaleString()}원`;
+  const realPct = Math.min(Math.round(realTotal / TARGET_REAL * 100), 999);
+  document.getElementById('asset-real-pct').textContent = `${realPct}% (${(TARGET_REAL - realTotal).toLocaleString()}원 남음)`;
+
+  // 전체 자산 목표 (8250만)
   document.getElementById('goal-current').textContent = `${currTotal.toLocaleString()}원`;
   const pct = Math.min(Math.round(currTotal / TARGET_AMOUNT * 100), 100);
   document.getElementById('goal-bar-fill').style.width = `${pct}%`;
   document.getElementById('goal-pct').textContent = `${pct}%`;
   const remaining = TARGET_AMOUNT - currTotal;
-  document.getElementById('goal-remaining').textContent = remaining > 0 
-    ? `${remaining.toLocaleString()}원 남음` 
+  document.getElementById('goal-remaining').textContent = remaining > 0
+    ? `${remaining.toLocaleString()}원 남음`
     : '목표 달성! 🎉';
 
   // 페이스 가이드 (오늘 기준 12월말까지 잔여 개월)
@@ -2435,7 +2481,7 @@ function renderAssets() {
       paceEl.textContent = `잔여 ${monthsLeft}개월 · 월 ${monthlyNeed.toLocaleString()}원 페이스`;
     }
   }
-  
+
   // 월별 추이
   renderAssetHistory();
 }
@@ -2477,42 +2523,63 @@ function renderAssetHistory() {
   }).join('');
 }
 
+let selectedAssetClassification = null;
+
 function openAssetModal(itemId) {
   editingAssetId = itemId || null;
   selectedAssetType = null;
-  
+  selectedAssetClassification = null;
+
   document.getElementById('asset-modal-title').textContent = itemId ? '자산 항목 수정' : '자산 항목 추가';
-  
-  // 분류 버튼 렌더링
+
+  // 통장 종류 버튼 렌더링
   const typeButtons = document.getElementById('asset-type-buttons');
-  typeButtons.innerHTML = ASSET_TYPES.map(t => 
+  typeButtons.innerHTML = ASSET_TYPES.map(t =>
     `<button class="asset-type-btn" onclick="selectAssetType('${t}')">${t}</button>`
   ).join('');
-  
+
+  // 8000만 카운트 분류 버튼 렌더링
+  const classButtons = document.getElementById('asset-classification-buttons');
+  classButtons.innerHTML = Object.entries(ASSET_CLASSIFICATIONS).map(([key, info]) =>
+    `<button class="asset-type-btn" onclick="selectAssetClassification('${key}')">${info.icon} ${info.label}</button>`
+  ).join('');
+
   // 기존 데이터 로드
   if (itemId) {
     const data = getAssets();
     const item = data.items.find(i => i.id === itemId);
     if (item) {
       selectAssetType(item.type);
+      selectAssetClassification(item.classification || 'real');
       document.getElementById('asset-modal-name').value = item.name;
       const snapshot = data.snapshots[currentAssetMonth] || {};
       document.getElementById('asset-modal-amount').value = snapshot[itemId] !== undefined ? snapshot[itemId] : '';
     }
     document.getElementById('asset-delete-btn').style.display = 'block';
   } else {
+    // 신규 추가 시 기본값: 진짜 자산
+    selectAssetClassification('real');
     document.getElementById('asset-modal-name').value = '';
     document.getElementById('asset-modal-amount').value = '';
     document.getElementById('asset-delete-btn').style.display = 'none';
   }
-  
+
   document.getElementById('asset-modal').classList.add('active');
 }
 
 function selectAssetType(type) {
   selectedAssetType = type;
-  document.querySelectorAll('.asset-type-btn').forEach(btn => {
+  document.querySelectorAll('#asset-type-buttons .asset-type-btn').forEach(btn => {
     btn.classList.toggle('active', btn.textContent === type);
+  });
+}
+
+function selectAssetClassification(classification) {
+  selectedAssetClassification = classification;
+  const info = ASSET_CLASSIFICATIONS[classification];
+  const targetText = info ? `${info.icon} ${info.label}` : '';
+  document.querySelectorAll('#asset-classification-buttons .asset-type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === targetText);
   });
 }
 
@@ -2524,30 +2591,38 @@ function closeAssetModal() {
   document.getElementById('asset-modal').classList.remove('active');
   editingAssetId = null;
   selectedAssetType = null;
+  selectedAssetClassification = null;
 }
 
 function saveAsset() {
   const name = document.getElementById('asset-modal-name').value.trim();
   const amount = parseInt(document.getElementById('asset-modal-amount').value) || 0;
-  
-  if (!selectedAssetType) { alert('분류를 선택해주세요'); return; }
+
+  if (!selectedAssetType) { alert('통장 종류를 선택해주세요'); return; }
+  if (!selectedAssetClassification) { alert('8000만 카운트 분류를 선택해주세요'); return; }
   if (!name) { alert('항목명을 입력해주세요'); return; }
-  
+
   const data = getAssets();
-  
+
   if (editingAssetId) {
     // 수정
     const item = data.items.find(i => i.id === editingAssetId);
     if (item) {
       item.name = name;
       item.type = selectedAssetType;
+      item.classification = selectedAssetClassification;
     }
     if (!data.snapshots[currentAssetMonth]) data.snapshots[currentAssetMonth] = {};
     data.snapshots[currentAssetMonth][editingAssetId] = amount;
   } else {
     // 추가
     const newId = 'asset_' + Date.now();
-    data.items.push({ id: newId, name, type: selectedAssetType });
+    data.items.push({
+      id: newId,
+      name,
+      type: selectedAssetType,
+      classification: selectedAssetClassification
+    });
     if (!data.snapshots[currentAssetMonth]) data.snapshots[currentAssetMonth] = {};
     data.snapshots[currentAssetMonth][newId] = amount;
   }
@@ -2639,6 +2714,78 @@ if (!localStorage.getItem(SEED_KEY)) {
   };
   saveAssets(seedData);
   localStorage.setItem(SEED_KEY, 'true');
+}
+
+// v3 마이그레이션: 자산 분류 부여 + 파킹통장 분리 + 자유적금 추가
+const ASSET_V3_KEY = 'cookie_budget_assets_v3_migrated';
+if (!localStorage.getItem(ASSET_V3_KEY)) {
+  const data = getAssets();
+
+  // 1. 기존 항목 분류 부여 (메모리 20 기준)
+  const classificationMap = {
+    'asset_v2_1': 'real',       // 신한 쏠편한 입출금
+    'asset_v2_2': 'real',       // 정기예금
+    'asset_v2_3': 'real',
+    'asset_v2_4': 'real',
+    'asset_v2_5': 'real',
+    'asset_v2_6': 'real',
+    'asset_v2_7': 'real',       // 주택청약
+    'asset_v2_8': 'real',       // 1982 적금
+    'asset_v2_9': 'purposed',   // 시술 적금
+    'asset_v2_10': 'real',      // 파킹통장 비상금 (분리 후)
+    'asset_v2_11': 'purposed',  // CMA 비정기 적립
+    'asset_v2_12': 'real',      // ISA
+    'asset_v2_13': 'real'       // 토스증권
+  };
+
+  data.items.forEach(item => {
+    if (!item.classification) {
+      item.classification = classificationMap[item.id] || 'real';
+    }
+  });
+
+  // 2. 파킹통장 분리: v2_10을 "비상금"으로 이름 변경, 가방시드 새 항목 추가
+  const parking = data.items.find(i => i.id === 'asset_v2_10');
+  if (parking && !data.items.find(i => i.id === 'asset_v3_parking_bag')) {
+    parking.name = '미래에셋 파킹통장 (비상금)';
+    parking.classification = 'real';
+
+    data.items.push({
+      id: 'asset_v3_parking_bag',
+      name: '미래에셋 파킹통장 (가방시드)',
+      type: '입출금',
+      classification: 'purposed'
+    });
+
+    // 잔액 분배: 모든 snapshot의 v2_10에서 350만(가방시드) 분리
+    Object.keys(data.snapshots).forEach(month => {
+      const snapshot = data.snapshots[month];
+      if (snapshot['asset_v2_10'] !== undefined) {
+        const total = snapshot['asset_v2_10'];
+        const bagSeed = Math.min(3500000, total); // 350만 최대
+        const emergency = total - bagSeed;
+        snapshot['asset_v2_10'] = emergency;
+        snapshot['asset_v3_parking_bag'] = bagSeed;
+      }
+    });
+  }
+
+  // 3. 자유적금 항목 추가 (5/6 가입, 14만, 페이스 맞추기용)
+  if (!data.items.find(i => i.id === 'asset_v3_free_savings')) {
+    data.items.push({
+      id: 'asset_v3_free_savings',
+      name: '자유적금 (월 178만 페이스용, 14만/월)',
+      type: '적금',
+      classification: 'real'
+    });
+    // 5월 잔액 14만 자동 설정
+    if (data.snapshots['2026-05']) {
+      data.snapshots['2026-05']['asset_v3_free_savings'] = 140000;
+    }
+  }
+
+  saveAssets(data);
+  localStorage.setItem(ASSET_V3_KEY, 'true');
 }
 </script>
 
