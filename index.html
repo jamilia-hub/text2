@@ -693,6 +693,42 @@ body {
   font-weight: 600;
 }
 
+
+/* v2_12: 내역/수입 카테고리별 묶어보기 */
+.view-tabs {
+  margin: 12px 0 14px;
+}
+.category-group {
+  margin-bottom: 14px;
+}
+.category-group-header {
+  background: #f5f1ea;
+  border: 1px solid #e8e2d8;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #3d3833;
+  font-weight: 600;
+}
+.category-group-header .meta {
+  color: #8a7f72;
+  font-weight: 500;
+  font-size: 12px;
+  margin-left: 8px;
+}
+.category-group-header .amount {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.category-group-header .amount.income {
+  color: #6a9a6a;
+}
+
 </style>
 </head>
 <body>
@@ -706,7 +742,7 @@ body {
   <div class="tab active" data-tab="input">지출</div>
   <div class="tab" data-tab="income">수입</div>
   <div class="tab" data-tab="list">내역</div>
-  <div class="tab" data-tab="stats">통계</div>
+  <div class="tab" data-tab="stats">예산</div>
   <div class="tab" data-tab="assets">자산</div>
 </div>
 
@@ -725,7 +761,7 @@ body {
       <div class="category-grid" id="category-grid"></div>
 
       <!-- 빠른 상담 버튼 -->
-      <div class="section-title" style="margin-top:20px;">지피티 재무이사한테 상담받기</div>
+      <div class="section-title" style="margin-top:20px;">클로드한테 상담받기</div>
       <div class="consult-options">
         <button class="consult-option" onclick="prepareConsult('daily')">
           <span class="emoji">🌅</span>하루 결산
@@ -757,7 +793,7 @@ body {
         <button onclick="changeFixedMonth(1)">›</button>
       </div>
       <div class="fixed-progress">
-        <div class="progress-text" id="fixed-progress-text">진행 0/14</div>
+        <div class="progress-text" id="fixed-progress-text">진행 0/16</div>
         <div class="progress-amount" id="fixed-progress-amount">결제 합계: 0원</div>
         <div class="progress-bar"><div class="progress-bar-fill" id="fixed-progress-fill" style="width:0%"></div></div>
       </div>
@@ -771,6 +807,10 @@ body {
     <div class="total-card income">
       <div class="total-label">이번 달 수입</div>
       <div class="total-amount" id="income-total">0원</div>
+    </div>
+    <div class="sub-tabs view-tabs">
+      <div class="sub-tab active" data-income-view="date" onclick="switchIncomeView('date')">날짜순</div>
+      <div class="sub-tab" data-income-view="category" onclick="switchIncomeView('category')">카테고리별</div>
     </div>
     <div class="entry-list" id="income-list"></div>
   </div>
@@ -793,6 +833,10 @@ body {
         <span>💰 저금 별도</span>
         <span id="list-saving" style="font-weight:600;">0원</span>
       </div>
+    </div>
+    <div class="sub-tabs view-tabs">
+      <div class="sub-tab active" data-list-view="date" onclick="switchListView('date')">날짜순</div>
+      <div class="sub-tab" data-list-view="category" onclick="switchListView('category')">카테고리별</div>
     </div>
     <div class="entry-list" id="entry-list"></div>
     <div class="action-row">
@@ -986,7 +1030,7 @@ body {
       <div class="prompt-preview" id="prompt-preview"></div>
       <div class="btn-row">
         <button class="btn btn-cancel" onclick="closeConsultModal()">닫기</button>
-        <button class="btn btn-save" onclick="openGPT()">ChatGPT 열기</button>
+        <button class="btn btn-save" onclick="openClaude()">Claude 열기</button>
       </div>
     </div>
   </div>
@@ -1041,7 +1085,7 @@ const BUDGETS = {
   '식비': 700000, '교통': 150000, '미용': 150000, '발레': 50000,
   '취미': 0, '일반쇼핑': 200000, '생활용품': 50000, '고양이': 70000,
   '의료': 50000, '모임': 20000, '여행': 0, '번역': 0, '부업': 0,
-  '가사도우미': 70000, '저금': 0, '기타': 100000
+  '가사도우미': 30000, '저금': 0, '기타': 100000
 };
 
 // 저금 카테고리: 8000만 카운트되는 자산 증식 (예산 X, 합계만 표시)
@@ -1058,8 +1102,9 @@ const FIXED_TEMPLATE = [
   {id: 'health', name: '건강보험', defaultAmount: 102560, category: '의료'},
   {id: 'cancer', name: '암보험', defaultAmount: 63830, category: '의료'},
   {id: 'general', name: '실비보험', defaultAmount: 27800, category: '의료'},
-  {id: 'ballet_sub', name: '발레학원 (서브)', defaultAmount: 250000, category: '발레', sub: '학원'},
-  {id: 'cleaning', name: '가사도우미 (격주)', defaultAmount: 70000, category: '가사도우미'},
+  {id: 'ballet_main', name: '발레학원 (본진)', defaultAmount: 160000, category: '발레', sub: '학원'},
+  {id: 'ballet_sub', name: '발레학원 (서브)', defaultAmount: 200000, category: '발레', sub: '학원'},
+  {id: 'cleaning', name: '가사도우미 (주 1회)', defaultAmount: 140000, category: '가사도우미'},
   {id: 'auto_saving', name: '1982 전설의 적금 (자동이체)', defaultAmount: 300000, category: '저금', sub: '적금'},
   {id: 'friend', name: '친구 모임', defaultAmount: 20000, category: '모임'},
   {id: 'family', name: '가족 모임', defaultAmount: 50000, category: '모임'},
@@ -1074,6 +1119,8 @@ const FIXED_STATE_KEY = 'cookie_budget_fixed_state'; // {yyyymm: {id: {checked, 
 let selectedCategory = null;
 let selectedSub = null;
 let selectedIncomeCategory = null;
+let listViewMode = 'date';
+let incomeViewMode = 'date';
 let consultType = null;
 let currentFixedMonth = null; // 'yyyy-mm'
 let currentFixedItem = null; // 체크하려는 항목 id
@@ -1427,6 +1474,48 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // ===== 내역 =====
+function renderEntryCard(e) {
+  return `
+    <div class="entry">
+      <div class="entry-info" onclick="editEntry(${e.id})" style="cursor:pointer;">
+        <div class="entry-cat">${e.date} · ${e.category}${e.sub ? ' · ' + e.sub : ''}</div>
+        <div class="entry-memo">${e.memo || '-'}</div>
+      </div>
+      <div class="entry-amount" onclick="editEntry(${e.id})" style="cursor:pointer;">${e.amount.toLocaleString()}원</div>
+      <span class="entry-delete" onclick="event.stopPropagation(); deleteEntry(${e.id})">삭제</span>
+    </div>
+  `;
+}
+
+function renderIncomeCard(e) {
+  return `
+    <div class="entry">
+      <div class="entry-info" onclick="editIncome(${e.id})" style="cursor:pointer;">
+        <div class="entry-cat">${e.date} · ${e.category}${e.source ? ' · ' + e.source : ''}</div>
+        <div class="entry-memo">${e.memo || '-'}</div>
+      </div>
+      <div class="entry-amount income" onclick="editIncome(${e.id})" style="cursor:pointer;">+${e.amount.toLocaleString()}원</div>
+      <span class="entry-delete" onclick="event.stopPropagation(); deleteIncome(${e.id})">삭제</span>
+    </div>
+  `;
+}
+
+function switchListView(mode) {
+  listViewMode = mode;
+  document.querySelectorAll('[data-list-view]').forEach(t => t.classList.remove('active'));
+  const el = document.querySelector(`[data-list-view="${mode}"]`);
+  if (el) el.classList.add('active');
+  renderList();
+}
+
+function switchIncomeView(mode) {
+  incomeViewMode = mode;
+  document.querySelectorAll('[data-income-view]').forEach(t => t.classList.remove('active'));
+  const el = document.querySelector(`[data-income-view="${mode}"]`);
+  if (el) el.classList.add('active');
+  renderIncomeList();
+}
+
 function renderList() {
   const entries = getEntries();
   const startDate = document.getElementById('filter-start').value;
@@ -1469,17 +1558,29 @@ function renderList() {
     list.innerHTML = '<div class="empty-state">기록이 없습니다</div>';
     return;
   }
-  
-  list.innerHTML = filtered.map(e => `
-    <div class="entry">
-      <div class="entry-info" onclick="editEntry(${e.id})" style="cursor:pointer;">
-        <div class="entry-cat">${e.date} · ${e.category}${e.sub ? ' · ' + e.sub : ''}</div>
-        <div class="entry-memo">${e.memo || '-'}</div>
+
+  if (listViewMode === 'category') {
+    const byCategory = {};
+    filtered.forEach(e => {
+      if (!byCategory[e.category]) byCategory[e.category] = [];
+      byCategory[e.category].push(e);
+    });
+    const groups = Object.entries(byCategory)
+      .map(([cat, items]) => ({ cat, items, total: items.reduce((sum, e) => sum + e.amount, 0) }))
+      .sort((a,b) => b.total - a.total || a.cat.localeCompare(b.cat));
+    list.innerHTML = groups.map(g => `
+      <div class="category-group">
+        <div class="category-group-header">
+          <span>${g.cat}<span class="meta">${g.items.length}건</span></span>
+          <span class="amount">${g.total.toLocaleString()}원</span>
+        </div>
+        ${g.items.map(renderEntryCard).join('')}
       </div>
-      <div class="entry-amount" onclick="editEntry(${e.id})" style="cursor:pointer;">${e.amount.toLocaleString()}원</div>
-      <span class="entry-delete" onclick="event.stopPropagation(); deleteEntry(${e.id})">삭제</span>
-    </div>
-  `).join('');
+    `).join('');
+    return;
+  }
+  
+  list.innerHTML = filtered.map(renderEntryCard).join('');
 }
 
 function renderIncomeList() {
@@ -1493,17 +1594,29 @@ function renderIncomeList() {
     list.innerHTML = '<div class="empty-state">이번 달 수입 기록이 없습니다</div>';
     return;
   }
-  
-  list.innerHTML = filtered.map(e => `
-    <div class="entry">
-      <div class="entry-info" onclick="editIncome(${e.id})" style="cursor:pointer;">
-        <div class="entry-cat">${e.date} · ${e.category}${e.source ? ' · ' + e.source : ''}</div>
-        <div class="entry-memo">${e.memo || '-'}</div>
+
+  if (incomeViewMode === 'category') {
+    const byCategory = {};
+    filtered.forEach(e => {
+      if (!byCategory[e.category]) byCategory[e.category] = [];
+      byCategory[e.category].push(e);
+    });
+    const groups = Object.entries(byCategory)
+      .map(([cat, items]) => ({ cat, items, total: items.reduce((sum, e) => sum + e.amount, 0) }))
+      .sort((a,b) => b.total - a.total || a.cat.localeCompare(b.cat));
+    list.innerHTML = groups.map(g => `
+      <div class="category-group">
+        <div class="category-group-header">
+          <span>${g.cat}<span class="meta">${g.items.length}건</span></span>
+          <span class="amount income">+${g.total.toLocaleString()}원</span>
+        </div>
+        ${g.items.map(renderIncomeCard).join('')}
       </div>
-      <div class="entry-amount income" onclick="editIncome(${e.id})" style="cursor:pointer;">+${e.amount.toLocaleString()}원</div>
-      <span class="entry-delete" onclick="event.stopPropagation(); deleteIncome(${e.id})">삭제</span>
-    </div>
-  `).join('');
+    `).join('');
+    return;
+  }
+  
+  list.innerHTML = filtered.map(renderIncomeCard).join('');
 }
 
 function deleteEntry(id) {
@@ -1895,7 +2008,7 @@ function confirmFixedCheck() {
 // ===== JSON 백업/복원 =====
 function exportJSON() {
   const data = {
-    version: 'v2_10_gpt',
+    version: 'v2_12',
     exportDate: new Date().toISOString(),
     entries: getEntries(),
     incomes: getIncomes(),
@@ -1979,7 +2092,7 @@ function exportCSV() {
 document.getElementById('filter-start').addEventListener('change', renderList);
 document.getElementById('filter-end').addEventListener('change', renderList);
 
-// ===== ChatGPT 상담 =====
+// ===== 클로드 상담 =====
 function prepareConsult(type) {
   consultType = type;
   document.getElementById('consult-result').style.display = 'none';
@@ -2129,8 +2242,6 @@ function getThisWeekData() {
 function generatePrompt() {
   let prompt = '';
 
-  const cfoPrefix = `너는 쿠키의 재무이사야. 목표는 2026년 말 진짜 자산 8000만원, 무리하면 7800만원 현실 목표. 변동예산은 월 161만원, 가능하면 30만원 남기기. 발레·고양이·가사도우미·건강관리는 삶 유지비로 보고, 충동구매는 냉정하게 막아줘. 답변은 짧고 명확하게, 표와 숫자로 판단해줘.\n\n`;
-
   // 카테고리+sub 라인 헬퍼
   const formatCatLine = (cat, amt, bySub, withBudget = false) => {
     const budget = BUDGETS[cat] || 0;
@@ -2265,7 +2376,7 @@ function generatePrompt() {
       if (asset.diff !== 0) prompt += `- 이번 달 자산 변화: ${asset.diff >= 0 ? '+' : ''}${asset.diff.toLocaleString()}원\n`;
     }
     
-    prompt += `\n이번 주 평가 + 다음 주 가이드 부탁. 프로젝트 지침/재정종합파일에 있는 자기관리 룰, 8000만원 목표, 자기 박대 패턴 다 고려해서 잔소리 + 조언 부탁해.`;
+    prompt += `\n이번 주 평가 + 다음 주 가이드 부탁. 메모리에 있는 자기관리 룰, 8000만원 목표, 자기 박대 패턴 다 고려해서 잔소리 + 조언 부탁해.`;
     
   } else if (consultType === 'monthly') {
     const month = getCurrentMonthData();
@@ -2363,7 +2474,6 @@ function generatePrompt() {
     }
   }
   
-  prompt = cfoPrefix + prompt;
   document.getElementById('prompt-preview').textContent = prompt;
   document.getElementById('consult-result').style.display = 'block';
   copyToClipboard(prompt);
@@ -2400,8 +2510,8 @@ function fallbackCopy(text, status) {
   document.body.removeChild(ta);
 }
 
-function openGPT() {
-  window.open('https://chatgpt.com/', '_blank');
+function openClaude() {
+  window.open('https://claude.ai/new', '_blank');
 }
 
 function closeConsultModal() {
