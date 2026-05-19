@@ -694,25 +694,30 @@ body {
 }
 
 
-/* v2_12: 내역/수입 카테고리별 묶어보기 */
+/* v2_13: 내역/수입 카테고리별 접기 보기 */
 .view-tabs {
   margin: 12px 0 14px;
 }
 .category-group {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .category-group-header {
   background: #f5f1ea;
   border: 1px solid #e8e2d8;
   border-radius: 10px;
   padding: 12px 14px;
-  margin-bottom: 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   font-size: 13px;
   color: #3d3833;
   font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+.category-group-header:active {
+  background: #ede5d8;
 }
 .category-group-header .meta {
   color: #8a7f72;
@@ -727,6 +732,14 @@ body {
 }
 .category-group-header .amount.income {
   color: #6a9a6a;
+}
+.category-group-header .chevron {
+  color: #8a7f72;
+  font-size: 12px;
+  margin-left: 6px;
+}
+.category-group-body {
+  margin-top: 8px;
 }
 
 </style>
@@ -1121,6 +1134,8 @@ let selectedSub = null;
 let selectedIncomeCategory = null;
 let listViewMode = 'date';
 let incomeViewMode = 'date';
+let expandedListCategories = new Set();
+let expandedIncomeCategories = new Set();
 let consultType = null;
 let currentFixedMonth = null; // 'yyyy-mm'
 let currentFixedItem = null; // 체크하려는 항목 id
@@ -1516,6 +1531,18 @@ function switchIncomeView(mode) {
   renderIncomeList();
 }
 
+function toggleListCategory(cat) {
+  if (expandedListCategories.has(cat)) expandedListCategories.delete(cat);
+  else expandedListCategories.add(cat);
+  renderList();
+}
+
+function toggleIncomeCategory(cat) {
+  if (expandedIncomeCategories.has(cat)) expandedIncomeCategories.delete(cat);
+  else expandedIncomeCategories.add(cat);
+  renderIncomeList();
+}
+
 function renderList() {
   const entries = getEntries();
   const startDate = document.getElementById('filter-start').value;
@@ -1568,15 +1595,19 @@ function renderList() {
     const groups = Object.entries(byCategory)
       .map(([cat, items]) => ({ cat, items, total: items.reduce((sum, e) => sum + e.amount, 0) }))
       .sort((a,b) => b.total - a.total || a.cat.localeCompare(b.cat));
-    list.innerHTML = groups.map(g => `
-      <div class="category-group">
-        <div class="category-group-header">
-          <span>${g.cat}<span class="meta">${g.items.length}건</span></span>
-          <span class="amount">${g.total.toLocaleString()}원</span>
+    list.innerHTML = groups.map(g => {
+      const expanded = expandedListCategories.has(g.cat);
+      const catArg = JSON.stringify(g.cat).replace(/"/g, '&quot;');
+      return `
+        <div class="category-group">
+          <div class="category-group-header" onclick="toggleListCategory(${catArg})">
+            <span>${g.cat}<span class="meta">${g.items.length}건</span></span>
+            <span class="amount">${g.total.toLocaleString()}원<span class="chevron">${expanded ? '▲' : '▼'}</span></span>
+          </div>
+          ${expanded ? `<div class="category-group-body">${g.items.map(renderEntryCard).join('')}</div>` : ''}
         </div>
-        ${g.items.map(renderEntryCard).join('')}
-      </div>
-    `).join('');
+      `;
+    }).join('');
     return;
   }
   
@@ -1604,15 +1635,19 @@ function renderIncomeList() {
     const groups = Object.entries(byCategory)
       .map(([cat, items]) => ({ cat, items, total: items.reduce((sum, e) => sum + e.amount, 0) }))
       .sort((a,b) => b.total - a.total || a.cat.localeCompare(b.cat));
-    list.innerHTML = groups.map(g => `
-      <div class="category-group">
-        <div class="category-group-header">
-          <span>${g.cat}<span class="meta">${g.items.length}건</span></span>
-          <span class="amount income">+${g.total.toLocaleString()}원</span>
+    list.innerHTML = groups.map(g => {
+      const expanded = expandedIncomeCategories.has(g.cat);
+      const catArg = JSON.stringify(g.cat).replace(/"/g, '&quot;');
+      return `
+        <div class="category-group">
+          <div class="category-group-header" onclick="toggleIncomeCategory(${catArg})">
+            <span>${g.cat}<span class="meta">${g.items.length}건</span></span>
+            <span class="amount income">+${g.total.toLocaleString()}원<span class="chevron">${expanded ? '▲' : '▼'}</span></span>
+          </div>
+          ${expanded ? `<div class="category-group-body">${g.items.map(renderIncomeCard).join('')}</div>` : ''}
         </div>
-        ${g.items.map(renderIncomeCard).join('')}
-      </div>
-    `).join('');
+      `;
+    }).join('');
     return;
   }
   
