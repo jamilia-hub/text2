@@ -510,6 +510,40 @@ body {
 }
 .checklist-item.checked .checklist-amount { color: #6a9a6a; }
 
+.fixed-section-label {
+  font-size: 12px;
+  color: #8a7f72;
+  margin: 14px 4px 8px;
+  font-weight: 600;
+}
+
+.fixed-completed-toggle {
+  width: 100%;
+  background: #fff;
+  border: 1px dashed #d8cbb8;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-top: 12px;
+  margin-bottom: 8px;
+  color: #8a7f72;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.fixed-completed-toggle:active { background: #f5f1ea; }
+
+.fixed-empty-unpaid {
+  background: #f5f1ea;
+  border: 1px solid #e8e2d8;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+  text-align: center;
+  color: #8a7f72;
+  font-size: 13px;
+}
+
 .month-selector {
   display: flex;
   align-items: center;
@@ -1135,6 +1169,7 @@ let listViewMode = 'date';
 let incomeViewMode = 'date';
 let expandedListCategories = new Set();
 let expandedIncomeCategories = new Set();
+let showCompletedFixedItems = false;
 let consultType = null;
 let currentFixedMonth = null; // 'yyyy-mm'
 let currentFixedItem = null; // 체크하려는 항목 id
@@ -1924,6 +1959,7 @@ function changeFixedMonth(delta) {
   const [y, m] = currentFixedMonth.split('-').map(Number);
   const d = new Date(y, m - 1 + delta, 1);
   currentFixedMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  showCompletedFixedItems = false;
   renderFixedChecklist();
 }
 
@@ -1938,38 +1974,74 @@ function renderFixedChecklist() {
   
   let checkedCount = 0;
   let totalAmount = 0;
+  const unpaidItems = [];
+  const completedItems = [];
   
-  const list = document.getElementById('fixed-checklist');
-  list.innerHTML = FIXED_TEMPLATE.map(item => {
+  FIXED_TEMPLATE.forEach(item => {
     const itemState = monthState[item.id];
     const isChecked = !!itemState;
     if (isChecked) {
       checkedCount++;
       totalAmount += itemState.amount;
+      completedItems.push({ item, itemState, isChecked });
+    } else {
+      unpaidItems.push({ item, itemState: null, isChecked });
     }
-    
-    const displayAmount = isChecked ? itemState.amount : item.defaultAmount;
-    const detail = isChecked 
-      ? `${itemState.date} 결제 완료` 
-      : (item.variable ? '변동 (직접 입력)' : '미결제');
-    
-    return `
-      <div class="checklist-item ${isChecked ? 'checked' : ''}" onclick="toggleFixedCheck('${item.id}')">
-        <div class="checklist-checkbox">${isChecked ? '✓' : ''}</div>
-        <div class="checklist-info">
-          <div class="checklist-name">${item.name}</div>
-          <div class="checklist-detail">${detail}</div>
-        </div>
-        <div class="checklist-amount">${displayAmount.toLocaleString()}원</div>
-      </div>
-    `;
-  }).join('');
+  });
+  
+  const list = document.getElementById('fixed-checklist');
+  const unpaidHtml = unpaidItems.map(({item, itemState, isChecked}) => renderFixedChecklistItem(item, itemState, isChecked)).join('');
+  const completedHtml = completedItems.map(({item, itemState, isChecked}) => renderFixedChecklistItem(item, itemState, isChecked)).join('');
+  
+  let html = '';
+  html += `<div class="fixed-section-label">미결제 ${unpaidItems.length}건</div>`;
+  if (unpaidItems.length > 0) {
+    html += unpaidHtml;
+  } else {
+    html += `<div class="fixed-empty-unpaid">이번 달 미결제 항목 없음<br>고정비 체크 완료 ㅇㅅㅇ</div>`;
+  }
+  
+  if (completedItems.length > 0) {
+    html += `<button class="fixed-completed-toggle" onclick="toggleCompletedFixedItems(event)">`;
+    html += showCompletedFixedItems ? `✅ 결제 완료 ${completedItems.length}건 숨기기 ▲` : `✅ 결제 완료 ${completedItems.length}건 보기 ▼`;
+    html += `</button>`;
+    if (showCompletedFixedItems) {
+      html += `<div class="fixed-section-label">결제 완료 ${completedItems.length}건</div>`;
+      html += completedHtml;
+    }
+  }
+  
+  list.innerHTML = html;
   
   const totalItems = FIXED_TEMPLATE.length;
   const pct = Math.round(checkedCount / totalItems * 100);
   document.getElementById('fixed-progress-text').textContent = `진행 ${checkedCount}/${totalItems}`;
   document.getElementById('fixed-progress-amount').textContent = `결제 합계: ${totalAmount.toLocaleString()}원`;
   document.getElementById('fixed-progress-fill').style.width = `${pct}%`;
+}
+
+function renderFixedChecklistItem(item, itemState, isChecked) {
+  const displayAmount = isChecked ? itemState.amount : item.defaultAmount;
+  const detail = isChecked 
+    ? `${itemState.date} 결제 완료` 
+    : (item.variable ? '변동 (직접 입력)' : '미결제');
+  
+  return `
+    <div class="checklist-item ${isChecked ? 'checked' : ''}" onclick="toggleFixedCheck('${item.id}')">
+      <div class="checklist-checkbox">${isChecked ? '✓' : ''}</div>
+      <div class="checklist-info">
+        <div class="checklist-name">${item.name}</div>
+        <div class="checklist-detail">${detail}</div>
+      </div>
+      <div class="checklist-amount">${displayAmount.toLocaleString()}원</div>
+    </div>
+  `;
+}
+
+function toggleCompletedFixedItems(event) {
+  if (event) event.stopPropagation();
+  showCompletedFixedItems = !showCompletedFixedItems;
+  renderFixedChecklist();
 }
 
 function toggleFixedCheck(itemId) {
@@ -2043,7 +2115,7 @@ function confirmFixedCheck() {
 // ===== JSON 백업/복원 =====
 function exportJSON() {
   const data = {
-    version: 'v2_14',
+    version: 'v2_15',
     exportDate: new Date().toISOString(),
     entries: getEntries(),
     incomes: getIncomes(),
