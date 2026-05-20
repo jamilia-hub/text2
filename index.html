@@ -806,7 +806,7 @@ body {
         <button onclick="changeFixedMonth(1)">›</button>
       </div>
       <div class="fixed-progress">
-        <div class="progress-text" id="fixed-progress-text">진행 0/16</div>
+        <div class="progress-text" id="fixed-progress-text">진행 0/15</div>
         <div class="progress-amount" id="fixed-progress-amount">결제 합계: 0원</div>
         <div class="progress-bar"><div class="progress-bar-fill" id="fixed-progress-fill" style="width:0%"></div></div>
       </div>
@@ -1096,9 +1096,9 @@ const INCOME_SOURCES = {
 
 const BUDGETS = {
   '식비': 700000, '교통': 150000, '미용': 150000, '발레': 50000,
-  '취미': 0, '일반쇼핑': 200000, '생활용품': 50000, '고양이': 70000,
+  '취미': 0, '일반쇼핑': 150000, '생활용품': 50000, '고양이': 70000,
   '의료': 50000, '모임': 20000, '여행': 0, '번역': 0, '부업': 0,
-  '가사도우미': 30000, '저금': 0, '기타': 100000
+  '가사도우미': 140000, '저금': 0, '기타': 80000
 };
 
 // 저금 카테고리: 8000만 카운트되는 자산 증식 (예산 X, 합계만 표시)
@@ -1117,7 +1117,6 @@ const FIXED_TEMPLATE = [
   {id: 'general', name: '실비보험', defaultAmount: 27800, category: '의료'},
   {id: 'ballet_main', name: '발레학원 (본진)', defaultAmount: 160000, category: '발레', sub: '학원'},
   {id: 'ballet_sub', name: '발레학원 (서브)', defaultAmount: 200000, category: '발레', sub: '학원'},
-  {id: 'cleaning', name: '가사도우미 (주 1회)', defaultAmount: 140000, category: '가사도우미'},
   {id: 'auto_saving', name: '1982 전설의 적금 (자동이체)', defaultAmount: 300000, category: '저금', sub: '적금'},
   {id: 'friend', name: '친구 모임', defaultAmount: 20000, category: '모임'},
   {id: 'family', name: '가족 모임', defaultAmount: 50000, category: '모임'},
@@ -1407,9 +1406,10 @@ function saveFixedState(state) {
 function getFixedEntryIds() {
   const state = getFixedState();
   const ids = new Set();
+  const validFixedIds = new Set(FIXED_TEMPLATE.map(item => item.id));
   Object.values(state).forEach(monthState => {
-    Object.values(monthState).forEach(item => {
-      if (item && item.entryId) ids.add(item.entryId);
+    Object.entries(monthState).forEach(([itemId, item]) => {
+      if (validFixedIds.has(itemId) && item && item.entryId) ids.add(item.entryId);
     });
   });
   return ids;
@@ -2043,7 +2043,7 @@ function confirmFixedCheck() {
 // ===== JSON 백업/복원 =====
 function exportJSON() {
   const data = {
-    version: 'v2_12',
+    version: 'v2_14',
     exportDate: new Date().toISOString(),
     entries: getEntries(),
     incomes: getIncomes(),
