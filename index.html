@@ -510,40 +510,6 @@ body {
 }
 .checklist-item.checked .checklist-amount { color: #6a9a6a; }
 
-.fixed-section-label {
-  font-size: 12px;
-  color: #8a7f72;
-  margin: 14px 4px 8px;
-  font-weight: 600;
-}
-
-.fixed-completed-toggle {
-  width: 100%;
-  background: #fff;
-  border: 1px dashed #d8cbb8;
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-top: 12px;
-  margin-bottom: 8px;
-  color: #8a7f72;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-}
-.fixed-completed-toggle:active { background: #f5f1ea; }
-
-.fixed-empty-unpaid {
-  background: #f5f1ea;
-  border: 1px solid #e8e2d8;
-  border-radius: 10px;
-  padding: 16px;
-  margin-bottom: 12px;
-  text-align: center;
-  color: #8a7f72;
-  font-size: 13px;
-}
-
 .month-selector {
   display: flex;
   align-items: center;
@@ -727,55 +693,6 @@ body {
   font-weight: 600;
 }
 
-
-/* v2_13: 내역/수입 카테고리별 접기 보기 */
-.view-tabs {
-  margin: 12px 0 14px;
-}
-.category-group {
-  margin-bottom: 10px;
-}
-.category-group-header {
-  background: #f5f1ea;
-  border: 1px solid #e8e2d8;
-  border-radius: 10px;
-  padding: 12px 14px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: #3d3833;
-  font-weight: 600;
-  cursor: pointer;
-  user-select: none;
-}
-.category-group-header:active {
-  background: #ede5d8;
-}
-.category-group-header .meta {
-  color: #8a7f72;
-  font-weight: 500;
-  font-size: 12px;
-  margin-left: 8px;
-}
-.category-group-header .amount {
-  flex-shrink: 0;
-  font-size: 14px;
-  font-weight: 700;
-}
-.category-group-header .amount.income {
-  color: #6a9a6a;
-}
-.category-group-header .chevron {
-  color: #8a7f72;
-  font-size: 12px;
-  margin-left: 6px;
-}
-.category-group-body {
-  margin-top: 8px;
-}
-
 </style>
 </head>
 <body>
@@ -789,7 +706,7 @@ body {
   <div class="tab active" data-tab="input">지출</div>
   <div class="tab" data-tab="income">수입</div>
   <div class="tab" data-tab="list">내역</div>
-  <div class="tab" data-tab="stats">예산</div>
+  <div class="tab" data-tab="stats">통계</div>
   <div class="tab" data-tab="assets">자산</div>
 </div>
 
@@ -840,7 +757,7 @@ body {
         <button onclick="changeFixedMonth(1)">›</button>
       </div>
       <div class="fixed-progress">
-        <div class="progress-text" id="fixed-progress-text">진행 0/15</div>
+        <div class="progress-text" id="fixed-progress-text">진행 0/14</div>
         <div class="progress-amount" id="fixed-progress-amount">결제 합계: 0원</div>
         <div class="progress-bar"><div class="progress-bar-fill" id="fixed-progress-fill" style="width:0%"></div></div>
       </div>
@@ -855,10 +772,6 @@ body {
       <div class="total-label">이번 달 수입</div>
       <div class="total-amount" id="income-total">0원</div>
     </div>
-    <div class="sub-tabs view-tabs">
-      <div class="sub-tab active" data-income-view="date" onclick="switchIncomeView('date')">날짜순</div>
-      <div class="sub-tab" data-income-view="category" onclick="switchIncomeView('category')">카테고리별</div>
-    </div>
     <div class="entry-list" id="income-list"></div>
   </div>
 
@@ -870,7 +783,7 @@ body {
       <input type="date" id="filter-end">
     </div>
     <div class="total-card">
-      <div class="total-label">기간 지출 합계 (변동, 고정·저금 제외)</div>
+      <div class="total-label">기간 생활비 합계 (고정·저금·부업 제외)</div>
       <div class="total-amount" id="list-total">0원</div>
       <div id="list-fixed-row" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid rgba(0,0,0,0.08); justify-content:space-between; font-size:0.9em; color:#888;">
         <span>📌 고정 별도</span>
@@ -880,10 +793,10 @@ body {
         <span>💰 저금 별도</span>
         <span id="list-saving" style="font-weight:600;">0원</span>
       </div>
-    </div>
-    <div class="sub-tabs view-tabs">
-      <div class="sub-tab active" data-list-view="date" onclick="switchListView('date')">날짜순</div>
-      <div class="sub-tab" data-list-view="category" onclick="switchListView('category')">카테고리별</div>
+      <div id="list-business-row" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid rgba(0,0,0,0.08); justify-content:space-between; font-size:0.9em; color:#888;">
+        <span>🛒 부업 별도</span>
+        <span id="list-business" style="font-weight:600;">0원</span>
+      </div>
     </div>
     <div class="entry-list" id="entry-list"></div>
     <div class="action-row">
@@ -898,9 +811,9 @@ body {
 
   <div id="tab-stats" class="tab-content" style="display:none;">
     <div class="savings-card">
-      <h3>이번 달 저축 가능액</h3>
+      <h3>이번 달 생활비 기준 잔여액</h3>
       <div class="savings-row"><span class="label">수입</span><span class="value" id="stat-income">0원</span></div>
-      <div class="savings-row"><span class="label">변동지출</span><span class="value" id="stat-expense">0원</span></div>
+      <div class="savings-row"><span class="label">생활 변동지출</span><span class="value" id="stat-expense">0원</span></div>
       <div class="savings-row" id="stat-fixed-row" style="display:none;"><span class="label">고정지출</span><span class="value" id="stat-fixed">0원</span></div>
       <div class="savings-row highlight"><span class="label">저축 가능</span><span class="value" id="stat-savings">0원</span></div>
     </div>
@@ -911,6 +824,10 @@ body {
     <div class="savings-summary">
       <div class="label">💰 이번 달 저금 (자산 증식)</div>
       <div class="amount" id="stat-saving-total">0원</div>
+    </div>
+    <div class="savings-summary">
+      <div class="label">🛒 이번 달 부업 지출 (생활비 제외)</div>
+      <div class="amount" id="stat-business-total" style="color:#8a7f72;">0원</div>
     </div>
     <div class="section-title">카테고리별 (예산 대비)</div>
     <div id="stats-list"></div>
@@ -1130,14 +1047,19 @@ const INCOME_SOURCES = {
 
 const BUDGETS = {
   '식비': 700000, '교통': 150000, '미용': 150000, '발레': 50000,
-  '취미': 0, '일반쇼핑': 150000, '생활용품': 50000, '고양이': 70000,
+  '취미': 0, '일반쇼핑': 200000, '생활용품': 50000, '고양이': 70000,
   '의료': 50000, '모임': 20000, '여행': 0, '번역': 0, '부업': 0,
-  '가사도우미': 140000, '저금': 0, '기타': 80000
+  '가사도우미': 70000, '저금': 0, '기타': 100000
 };
 
 // 저금 카테고리: 8000만 카운트되는 자산 증식 (예산 X, 합계만 표시)
 // 저금은 지출 합계에서 제외하여 "저축 가능액" 정확히 계산
 const SAVING_CATEGORIES = ['저금'];
+const BUSINESS_CATEGORIES = ['부업'];
+// 생활비 기준 변동지출 합계에서 제외할 카테고리
+// - 저금: 자산 이동/증식
+// - 부업: 생활비와 분리 관리하는 사업비
+const EXCLUDED_FROM_VARIABLE_TOTAL = [...SAVING_CATEGORIES, ...BUSINESS_CATEGORIES];
 
 // 고정지출 항목 (체크리스트용 - id로 추적)
 const FIXED_TEMPLATE = [
@@ -1149,8 +1071,8 @@ const FIXED_TEMPLATE = [
   {id: 'health', name: '건강보험', defaultAmount: 102560, category: '의료'},
   {id: 'cancer', name: '암보험', defaultAmount: 63830, category: '의료'},
   {id: 'general', name: '실비보험', defaultAmount: 27800, category: '의료'},
-  {id: 'ballet_main', name: '발레학원 (본진)', defaultAmount: 160000, category: '발레', sub: '학원'},
-  {id: 'ballet_sub', name: '발레학원 (서브)', defaultAmount: 200000, category: '발레', sub: '학원'},
+  {id: 'ballet_sub', name: '발레학원 (서브)', defaultAmount: 250000, category: '발레', sub: '학원'},
+  {id: 'cleaning', name: '가사도우미 (격주)', defaultAmount: 70000, category: '가사도우미'},
   {id: 'auto_saving', name: '1982 전설의 적금 (자동이체)', defaultAmount: 300000, category: '저금', sub: '적금'},
   {id: 'friend', name: '친구 모임', defaultAmount: 20000, category: '모임'},
   {id: 'family', name: '가족 모임', defaultAmount: 50000, category: '모임'},
@@ -1165,11 +1087,6 @@ const FIXED_STATE_KEY = 'cookie_budget_fixed_state'; // {yyyymm: {id: {checked, 
 let selectedCategory = null;
 let selectedSub = null;
 let selectedIncomeCategory = null;
-let listViewMode = 'date';
-let incomeViewMode = 'date';
-let expandedListCategories = new Set();
-let expandedIncomeCategories = new Set();
-let showCompletedFixedItems = false;
 let consultType = null;
 let currentFixedMonth = null; // 'yyyy-mm'
 let currentFixedItem = null; // 체크하려는 항목 id
@@ -1441,10 +1358,9 @@ function saveFixedState(state) {
 function getFixedEntryIds() {
   const state = getFixedState();
   const ids = new Set();
-  const validFixedIds = new Set(FIXED_TEMPLATE.map(item => item.id));
   Object.values(state).forEach(monthState => {
-    Object.entries(monthState).forEach(([itemId, item]) => {
-      if (validFixedIds.has(itemId) && item && item.entryId) ids.add(item.entryId);
+    Object.values(monthState).forEach(item => {
+      if (item && item.entryId) ids.add(item.entryId);
     });
   });
   return ids;
@@ -1470,14 +1386,14 @@ function updateSummary() {
   const monthEntries = entries.filter(e => e.date.startsWith(yyyymm));
   const fixedIds = getFixedEntryIds();
   const monthExpense = monthEntries
-    .filter(e => !SAVING_CATEGORIES.includes(e.category) && !fixedIds.has(e.id))
+    .filter(e => !EXCLUDED_FROM_VARIABLE_TOTAL.includes(e.category) && !fixedIds.has(e.id))
     .reduce((sum, e) => sum + e.amount, 0);
   const monthFixed = monthEntries
     .filter(e => fixedIds.has(e.id))
     .reduce((sum, e) => sum + e.amount, 0);
   const headerText = monthFixed > 0
-    ? `변동 ${monthExpense.toLocaleString()}원 · 고정 ${monthFixed.toLocaleString()}원`
-    : `이번 달 지출: ${monthExpense.toLocaleString()}원`;
+    ? `생활변동 ${monthExpense.toLocaleString()}원 · 고정 ${monthFixed.toLocaleString()}원`
+    : `이번 달 생활변동: ${monthExpense.toLocaleString()}원`;
   document.getElementById('header-summary').textContent = headerText;
   
   const incomes = getIncomes();
@@ -1524,60 +1440,6 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // ===== 내역 =====
-function renderEntryCard(e) {
-  return `
-    <div class="entry">
-      <div class="entry-info" onclick="editEntry(${e.id})" style="cursor:pointer;">
-        <div class="entry-cat">${e.date} · ${e.category}${e.sub ? ' · ' + e.sub : ''}</div>
-        <div class="entry-memo">${e.memo || '-'}</div>
-      </div>
-      <div class="entry-amount" onclick="editEntry(${e.id})" style="cursor:pointer;">${e.amount.toLocaleString()}원</div>
-      <span class="entry-delete" onclick="event.stopPropagation(); deleteEntry(${e.id})">삭제</span>
-    </div>
-  `;
-}
-
-function renderIncomeCard(e) {
-  return `
-    <div class="entry">
-      <div class="entry-info" onclick="editIncome(${e.id})" style="cursor:pointer;">
-        <div class="entry-cat">${e.date} · ${e.category}${e.source ? ' · ' + e.source : ''}</div>
-        <div class="entry-memo">${e.memo || '-'}</div>
-      </div>
-      <div class="entry-amount income" onclick="editIncome(${e.id})" style="cursor:pointer;">+${e.amount.toLocaleString()}원</div>
-      <span class="entry-delete" onclick="event.stopPropagation(); deleteIncome(${e.id})">삭제</span>
-    </div>
-  `;
-}
-
-function switchListView(mode) {
-  listViewMode = mode;
-  document.querySelectorAll('[data-list-view]').forEach(t => t.classList.remove('active'));
-  const el = document.querySelector(`[data-list-view="${mode}"]`);
-  if (el) el.classList.add('active');
-  renderList();
-}
-
-function switchIncomeView(mode) {
-  incomeViewMode = mode;
-  document.querySelectorAll('[data-income-view]').forEach(t => t.classList.remove('active'));
-  const el = document.querySelector(`[data-income-view="${mode}"]`);
-  if (el) el.classList.add('active');
-  renderIncomeList();
-}
-
-function toggleListCategory(cat) {
-  if (expandedListCategories.has(cat)) expandedListCategories.delete(cat);
-  else expandedListCategories.add(cat);
-  renderList();
-}
-
-function toggleIncomeCategory(cat) {
-  if (expandedIncomeCategories.has(cat)) expandedIncomeCategories.delete(cat);
-  else expandedIncomeCategories.add(cat);
-  renderIncomeList();
-}
-
 function renderList() {
   const entries = getEntries();
   const startDate = document.getElementById('filter-start').value;
@@ -1591,10 +1453,13 @@ function renderList() {
   filtered.sort((a,b) => b.date.localeCompare(a.date) || b.id - a.id);
   
   const expenseTotal = filtered
-    .filter(e => !SAVING_CATEGORIES.includes(e.category) && !fixedIds.has(e.id))
+    .filter(e => !EXCLUDED_FROM_VARIABLE_TOTAL.includes(e.category) && !fixedIds.has(e.id))
     .reduce((sum,e) => sum + e.amount, 0);
   const savingTotal = filtered
     .filter(e => SAVING_CATEGORIES.includes(e.category))
+    .reduce((sum,e) => sum + e.amount, 0);
+  const businessTotal = filtered
+    .filter(e => BUSINESS_CATEGORIES.includes(e.category) && !fixedIds.has(e.id))
     .reduce((sum,e) => sum + e.amount, 0);
   const fixedTotal = filtered
     .filter(e => fixedIds.has(e.id))
@@ -1606,6 +1471,13 @@ function renderList() {
     document.getElementById('list-saving').textContent = `${savingTotal.toLocaleString()}원`;
   } else {
     savingRow.style.display = 'none';
+  }
+  const businessRow = document.getElementById('list-business-row');
+  if (businessTotal > 0) {
+    businessRow.style.display = 'flex';
+    document.getElementById('list-business').textContent = `${businessTotal.toLocaleString()}원`;
+  } else {
+    businessRow.style.display = 'none';
   }
   const fixedRow = document.getElementById('list-fixed-row');
   if (fixedTotal > 0) {
@@ -1620,33 +1492,17 @@ function renderList() {
     list.innerHTML = '<div class="empty-state">기록이 없습니다</div>';
     return;
   }
-
-  if (listViewMode === 'category') {
-    const byCategory = {};
-    filtered.forEach(e => {
-      if (!byCategory[e.category]) byCategory[e.category] = [];
-      byCategory[e.category].push(e);
-    });
-    const groups = Object.entries(byCategory)
-      .map(([cat, items]) => ({ cat, items, total: items.reduce((sum, e) => sum + e.amount, 0) }))
-      .sort((a,b) => b.total - a.total || a.cat.localeCompare(b.cat));
-    list.innerHTML = groups.map(g => {
-      const expanded = expandedListCategories.has(g.cat);
-      const catArg = JSON.stringify(g.cat).replace(/"/g, '&quot;');
-      return `
-        <div class="category-group">
-          <div class="category-group-header" onclick="toggleListCategory(${catArg})">
-            <span>${g.cat}<span class="meta">${g.items.length}건</span></span>
-            <span class="amount">${g.total.toLocaleString()}원<span class="chevron">${expanded ? '▲' : '▼'}</span></span>
-          </div>
-          ${expanded ? `<div class="category-group-body">${g.items.map(renderEntryCard).join('')}</div>` : ''}
-        </div>
-      `;
-    }).join('');
-    return;
-  }
   
-  list.innerHTML = filtered.map(renderEntryCard).join('');
+  list.innerHTML = filtered.map(e => `
+    <div class="entry">
+      <div class="entry-info" onclick="editEntry(${e.id})" style="cursor:pointer;">
+        <div class="entry-cat">${e.date} · ${e.category}${e.sub ? ' · ' + e.sub : ''}</div>
+        <div class="entry-memo">${e.memo || '-'}</div>
+      </div>
+      <div class="entry-amount" onclick="editEntry(${e.id})" style="cursor:pointer;">${e.amount.toLocaleString()}원</div>
+      <span class="entry-delete" onclick="event.stopPropagation(); deleteEntry(${e.id})">삭제</span>
+    </div>
+  `).join('');
 }
 
 function renderIncomeList() {
@@ -1660,33 +1516,17 @@ function renderIncomeList() {
     list.innerHTML = '<div class="empty-state">이번 달 수입 기록이 없습니다</div>';
     return;
   }
-
-  if (incomeViewMode === 'category') {
-    const byCategory = {};
-    filtered.forEach(e => {
-      if (!byCategory[e.category]) byCategory[e.category] = [];
-      byCategory[e.category].push(e);
-    });
-    const groups = Object.entries(byCategory)
-      .map(([cat, items]) => ({ cat, items, total: items.reduce((sum, e) => sum + e.amount, 0) }))
-      .sort((a,b) => b.total - a.total || a.cat.localeCompare(b.cat));
-    list.innerHTML = groups.map(g => {
-      const expanded = expandedIncomeCategories.has(g.cat);
-      const catArg = JSON.stringify(g.cat).replace(/"/g, '&quot;');
-      return `
-        <div class="category-group">
-          <div class="category-group-header" onclick="toggleIncomeCategory(${catArg})">
-            <span>${g.cat}<span class="meta">${g.items.length}건</span></span>
-            <span class="amount income">+${g.total.toLocaleString()}원<span class="chevron">${expanded ? '▲' : '▼'}</span></span>
-          </div>
-          ${expanded ? `<div class="category-group-body">${g.items.map(renderIncomeCard).join('')}</div>` : ''}
-        </div>
-      `;
-    }).join('');
-    return;
-  }
   
-  list.innerHTML = filtered.map(renderIncomeCard).join('');
+  list.innerHTML = filtered.map(e => `
+    <div class="entry">
+      <div class="entry-info" onclick="editIncome(${e.id})" style="cursor:pointer;">
+        <div class="entry-cat">${e.date} · ${e.category}${e.source ? ' · ' + e.source : ''}</div>
+        <div class="entry-memo">${e.memo || '-'}</div>
+      </div>
+      <div class="entry-amount income" onclick="editIncome(${e.id})" style="cursor:pointer;">+${e.amount.toLocaleString()}원</div>
+      <span class="entry-delete" onclick="event.stopPropagation(); deleteIncome(${e.id})">삭제</span>
+    </div>
+  `).join('');
 }
 
 function deleteEntry(id) {
@@ -1822,10 +1662,11 @@ function renderStats() {
     byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
   });
   
-  // 저금 카테고리는 별도 합계
+  // 저금/부업 카테고리는 생활비 기준 변동지출에서 제외하고 별도 합계
   const savingTotal = SAVING_CATEGORIES.reduce((sum, cat) => sum + (byCategory[cat] || 0), 0);
+  const businessTotal = BUSINESS_CATEGORIES.reduce((sum, cat) => sum + (byCategory[cat] || 0), 0);
   const totalExpense = Object.entries(byCategory)
-    .filter(([cat]) => !SAVING_CATEGORIES.includes(cat))
+    .filter(([cat]) => !EXCLUDED_FROM_VARIABLE_TOTAL.includes(cat))
     .reduce((sum, [, amt]) => sum + amt, 0);
   const fixedTotal = thisMonthFixed.reduce((sum, e) => sum + e.amount, 0);
   const totalIncome = thisMonthIncome.reduce((sum,e) => sum + e.amount, 0);
@@ -1847,10 +1688,14 @@ function renderStats() {
     fixedSummary.style.display = 'none';
   }
   
-  // 저금 합계 별도 표시
+  // 저금/부업 합계 별도 표시
   const savingEl = document.getElementById('stat-saving-total');
   if (savingEl) {
     savingEl.textContent = `${savingTotal.toLocaleString()}원`;
+  }
+  const businessEl = document.getElementById('stat-business-total');
+  if (businessEl) {
+    businessEl.textContent = `${businessTotal.toLocaleString()}원`;
   }
   
   const list = document.getElementById('stats-list');
@@ -1959,7 +1804,6 @@ function changeFixedMonth(delta) {
   const [y, m] = currentFixedMonth.split('-').map(Number);
   const d = new Date(y, m - 1 + delta, 1);
   currentFixedMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-  showCompletedFixedItems = false;
   renderFixedChecklist();
 }
 
@@ -1974,74 +1818,38 @@ function renderFixedChecklist() {
   
   let checkedCount = 0;
   let totalAmount = 0;
-  const unpaidItems = [];
-  const completedItems = [];
   
-  FIXED_TEMPLATE.forEach(item => {
+  const list = document.getElementById('fixed-checklist');
+  list.innerHTML = FIXED_TEMPLATE.map(item => {
     const itemState = monthState[item.id];
     const isChecked = !!itemState;
     if (isChecked) {
       checkedCount++;
       totalAmount += itemState.amount;
-      completedItems.push({ item, itemState, isChecked });
-    } else {
-      unpaidItems.push({ item, itemState: null, isChecked });
     }
-  });
-  
-  const list = document.getElementById('fixed-checklist');
-  const unpaidHtml = unpaidItems.map(({item, itemState, isChecked}) => renderFixedChecklistItem(item, itemState, isChecked)).join('');
-  const completedHtml = completedItems.map(({item, itemState, isChecked}) => renderFixedChecklistItem(item, itemState, isChecked)).join('');
-  
-  let html = '';
-  html += `<div class="fixed-section-label">미결제 ${unpaidItems.length}건</div>`;
-  if (unpaidItems.length > 0) {
-    html += unpaidHtml;
-  } else {
-    html += `<div class="fixed-empty-unpaid">이번 달 미결제 항목 없음<br>고정비 체크 완료 ㅇㅅㅇ</div>`;
-  }
-  
-  if (completedItems.length > 0) {
-    html += `<button class="fixed-completed-toggle" onclick="toggleCompletedFixedItems(event)">`;
-    html += showCompletedFixedItems ? `✅ 결제 완료 ${completedItems.length}건 숨기기 ▲` : `✅ 결제 완료 ${completedItems.length}건 보기 ▼`;
-    html += `</button>`;
-    if (showCompletedFixedItems) {
-      html += `<div class="fixed-section-label">결제 완료 ${completedItems.length}건</div>`;
-      html += completedHtml;
-    }
-  }
-  
-  list.innerHTML = html;
+    
+    const displayAmount = isChecked ? itemState.amount : item.defaultAmount;
+    const detail = isChecked 
+      ? `${itemState.date} 결제 완료` 
+      : (item.variable ? '변동 (직접 입력)' : '미결제');
+    
+    return `
+      <div class="checklist-item ${isChecked ? 'checked' : ''}" onclick="toggleFixedCheck('${item.id}')">
+        <div class="checklist-checkbox">${isChecked ? '✓' : ''}</div>
+        <div class="checklist-info">
+          <div class="checklist-name">${item.name}</div>
+          <div class="checklist-detail">${detail}</div>
+        </div>
+        <div class="checklist-amount">${displayAmount.toLocaleString()}원</div>
+      </div>
+    `;
+  }).join('');
   
   const totalItems = FIXED_TEMPLATE.length;
   const pct = Math.round(checkedCount / totalItems * 100);
   document.getElementById('fixed-progress-text').textContent = `진행 ${checkedCount}/${totalItems}`;
   document.getElementById('fixed-progress-amount').textContent = `결제 합계: ${totalAmount.toLocaleString()}원`;
   document.getElementById('fixed-progress-fill').style.width = `${pct}%`;
-}
-
-function renderFixedChecklistItem(item, itemState, isChecked) {
-  const displayAmount = isChecked ? itemState.amount : item.defaultAmount;
-  const detail = isChecked 
-    ? `${itemState.date} 결제 완료` 
-    : (item.variable ? '변동 (직접 입력)' : '미결제');
-  
-  return `
-    <div class="checklist-item ${isChecked ? 'checked' : ''}" onclick="toggleFixedCheck('${item.id}')">
-      <div class="checklist-checkbox">${isChecked ? '✓' : ''}</div>
-      <div class="checklist-info">
-        <div class="checklist-name">${item.name}</div>
-        <div class="checklist-detail">${detail}</div>
-      </div>
-      <div class="checklist-amount">${displayAmount.toLocaleString()}원</div>
-    </div>
-  `;
-}
-
-function toggleCompletedFixedItems(event) {
-  if (event) event.stopPropagation();
-  showCompletedFixedItems = !showCompletedFixedItems;
-  renderFixedChecklist();
 }
 
 function toggleFixedCheck(itemId) {
@@ -2115,7 +1923,7 @@ function confirmFixedCheck() {
 // ===== JSON 백업/복원 =====
 function exportJSON() {
   const data = {
-    version: 'v2_15',
+    version: 'v2_10',
     exportDate: new Date().toISOString(),
     entries: getEntries(),
     incomes: getIncomes(),
@@ -2266,11 +2074,19 @@ function getCurrentMonthData() {
     incomeByCategory[e.category] = (incomeByCategory[e.category] || 0) + e.amount;
   });
   
+  const livingTotal = Object.entries(byCategory)
+    .filter(([cat]) => !EXCLUDED_FROM_VARIABLE_TOTAL.includes(cat))
+    .reduce((sum, [, amt]) => sum + amt, 0);
+  const savingTotal = SAVING_CATEGORIES.reduce((sum, cat) => sum + (byCategory[cat] || 0), 0);
+  const businessTotal = BUSINESS_CATEGORIES.reduce((sum, cat) => sum + (byCategory[cat] || 0), 0);
+
   return { 
     entries: thisMonth, 
     byCategory,
     bySub,
-    total: Object.values(byCategory).reduce((a,b)=>a+b,0),
+    total: livingTotal,
+    savingTotal,
+    businessTotal,
     fixedEntries: thisMonthFixed,
     fixedByCategory,
     fixedTotal: thisMonthFixed.reduce((s,e)=>s+e.amount, 0),
@@ -2327,19 +2143,28 @@ function getThisWeekData() {
   monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
   monday.setHours(0,0,0,0);
   const mondayStr = `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`;
-  
-  const thisWeek = entries.filter(e => e.date >= mondayStr && !fixedIds.has(e.id));
+
+  const thisWeekAll = entries.filter(e => e.date >= mondayStr && !fixedIds.has(e.id));
+  const thisWeek = thisWeekAll.filter(e => !EXCLUDED_FROM_VARIABLE_TOTAL.includes(e.category));
   const thisWeekFixed = entries.filter(e => e.date >= mondayStr && fixedIds.has(e.id));
   const thisWeekIncome = incomes.filter(e => e.date >= mondayStr);
   const byCategory = {};
   thisWeek.forEach(e => {
     byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
   });
-  
+  const savingTotal = thisWeekAll
+    .filter(e => SAVING_CATEGORIES.includes(e.category))
+    .reduce((sum,e) => sum + e.amount, 0);
+  const businessTotal = thisWeekAll
+    .filter(e => BUSINESS_CATEGORIES.includes(e.category))
+    .reduce((sum,e) => sum + e.amount, 0);
+
   return { 
     entries: thisWeek, 
     byCategory, 
     total: Object.values(byCategory).reduce((a,b)=>a+b,0), 
+    savingTotal,
+    businessTotal,
     fixedTotal: thisWeekFixed.reduce((s,e)=>s+e.amount,0),
     startDate: mondayStr,
     incomeTotal: thisWeekIncome.reduce((sum,e)=>sum+e.amount,0)
@@ -2353,6 +2178,8 @@ function generatePrompt() {
   const formatCatLine = (cat, amt, bySub, withBudget = false) => {
     const budget = BUDGETS[cat] || 0;
     let line = `- ${cat}: ${amt.toLocaleString()}원`;
+    if (SAVING_CATEGORIES.includes(cat)) line += ` [저금 별도]`;
+    if (BUSINESS_CATEGORIES.includes(cat)) line += ` [부업 별도/생활비 제외]`;
     if (withBudget && budget > 0) {
       const pct = Math.round(amt/budget*100);
       line += ` / ${budget.toLocaleString()} (${pct}%)`;
@@ -2374,8 +2201,9 @@ function generatePrompt() {
     const incomes = getIncomes();
     const fixedIds = getFixedEntryIds();
     
-    const todayVariable = entries.filter(e => e.date === today && !fixedIds.has(e.id) && !SAVING_CATEGORIES.includes(e.category));
+    const todayVariable = entries.filter(e => e.date === today && !fixedIds.has(e.id) && !EXCLUDED_FROM_VARIABLE_TOTAL.includes(e.category));
     const todaySaving = entries.filter(e => e.date === today && !fixedIds.has(e.id) && SAVING_CATEGORIES.includes(e.category));
+    const todayBusiness = entries.filter(e => e.date === today && !fixedIds.has(e.id) && BUSINESS_CATEGORIES.includes(e.category));
     const todayFixed = entries.filter(e => e.date === today && fixedIds.has(e.id));
     const todayIncomes = incomes.filter(e => e.date === today);
     const monthEntries = entries.filter(e => e.date.startsWith(yyyymm) && !fixedIds.has(e.id));
@@ -2387,6 +2215,7 @@ function generatePrompt() {
     });
     const todayTotal = Object.values(todayByCat).reduce((a,b)=>a+b, 0);
     const todaySavingTotal = todaySaving.reduce((s,e)=>s+e.amount, 0);
+    const todayBusinessTotal = todayBusiness.reduce((s,e)=>s+e.amount, 0);
     const todayFixedTotal = todayFixed.reduce((s,e)=>s+e.amount, 0);
     const todayIncomeTotal = todayIncomes.reduce((sum,e)=>sum+e.amount, 0);
     
@@ -2396,22 +2225,22 @@ function generatePrompt() {
       monthByCat[e.category] = (monthByCat[e.category] || 0) + e.amount;
     });
     const monthExpense = Object.entries(monthByCat)
-      .filter(([cat]) => !SAVING_CATEGORIES.includes(cat))
+      .filter(([cat]) => !EXCLUDED_FROM_VARIABLE_TOTAL.includes(cat))
       .reduce((sum, [, amt]) => sum + amt, 0);
     const monthSaving = SAVING_CATEGORIES.reduce((sum, cat) => sum + (monthByCat[cat] || 0), 0);
     const monthFixed = monthFixedEntries.reduce((s,e)=>s+e.amount, 0);
     
     const monthBudgetTotal = Object.entries(BUDGETS)
-      .filter(([cat]) => !SAVING_CATEGORIES.includes(cat))
+      .filter(([cat]) => !EXCLUDED_FROM_VARIABLE_TOTAL.includes(cat))
       .reduce((sum, [, amt]) => sum + amt, 0);
     const pct = monthBudgetTotal > 0 ? Math.round(monthExpense / monthBudgetTotal * 100) : 0;
     
     prompt = `[쿠키 가계부 - 하루 결산]\n\n`;
     prompt += `오늘 날짜: ${today}\n\n`;
     
-    prompt += `[오늘 변동지출 합계: ${todayTotal.toLocaleString()}원]\n`;
+    prompt += `[오늘 생활 변동지출 합계: ${todayTotal.toLocaleString()}원]\n`;
     if (Object.keys(todayByCat).length === 0) {
-      prompt += `- 변동지출 없음\n`;
+      prompt += `- 생활 변동지출 없음\n`;
     } else {
       Object.entries(todayByCat).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
         prompt += `- ${cat}: ${amt.toLocaleString()}원\n`;
@@ -2420,6 +2249,12 @@ function generatePrompt() {
     if (todaySavingTotal > 0) {
       prompt += `\n[오늘 저금: ${todaySavingTotal.toLocaleString()}원]\n`;
       todaySaving.forEach(e => {
+        prompt += `- ${e.category}${e.sub ? ' · ' + e.sub : ''}: ${e.amount.toLocaleString()}원 (${e.memo || ''})\n`;
+      });
+    }
+    if (todayBusinessTotal > 0) {
+      prompt += `\n[오늘 부업 지출 별도: ${todayBusinessTotal.toLocaleString()}원]\n`;
+      todayBusiness.forEach(e => {
         prompt += `- ${e.category}${e.sub ? ' · ' + e.sub : ''}: ${e.amount.toLocaleString()}원 (${e.memo || ''})\n`;
       });
     }
@@ -2440,9 +2275,11 @@ function generatePrompt() {
     }
     
     prompt += `[이번 달 누적]\n`;
-    prompt += `- 변동지출 (저금·고정 제외): ${monthExpense.toLocaleString()} / ${monthBudgetTotal.toLocaleString()} (${pct}%)\n`;
+    prompt += `- 생활 변동지출 (저금·부업·고정 제외): ${monthExpense.toLocaleString()} / ${monthBudgetTotal.toLocaleString()} (${pct}%)\n`;
+    const monthBusiness = BUSINESS_CATEGORIES.reduce((sum, cat) => sum + (monthByCat[cat] || 0), 0);
     if (monthFixed > 0) prompt += `- 고정지출: ${monthFixed.toLocaleString()}원\n`;
     prompt += `- 저금: ${monthSaving.toLocaleString()}원\n`;
+    if (monthBusiness > 0) prompt += `- 부업 별도: ${monthBusiness.toLocaleString()}원\n`;
     prompt += `\n`;
     
     prompt += `오늘 지출이 이번 달 페이스 대비 어떤지 평가해줘. 잘했으면 잘했다고, 조절 필요하면 어디 줄여야 할지 짧고 명확하게 코멘트 부탁해.`;
@@ -2455,21 +2292,25 @@ function generatePrompt() {
     prompt = `[쿠키 가계부 - 주간 결산]\n\n`;
     prompt += `이번 주 (${week.startDate} ~ 오늘):\n`;
     if (Object.keys(week.byCategory).length === 0) {
-      prompt += `- 변동지출 기록 없음\n`;
+      prompt += `- 생활 변동지출 기록 없음\n`;
     } else {
       Object.entries(week.byCategory).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
         prompt += `- ${cat}: ${amt.toLocaleString()}원\n`;
       });
-      prompt += `- 주 변동지출 합계: ${week.total.toLocaleString()}원\n`;
+      prompt += `- 주 생활 변동지출 합계: ${week.total.toLocaleString()}원\n`;
     }
+    if (week.savingTotal > 0) prompt += `- 주 저금: ${week.savingTotal.toLocaleString()}원\n`;
+    if (week.businessTotal > 0) prompt += `- 주 부업 지출 별도: ${week.businessTotal.toLocaleString()}원\n`;
     if (week.fixedTotal > 0) prompt += `- 주 고정지출: ${week.fixedTotal.toLocaleString()}원\n`;
     if (week.incomeTotal > 0) prompt += `- 주 수입: ${week.incomeTotal.toLocaleString()}원\n`;
     
-    prompt += `\n이번 달 누적 (변동지출, 예산 대비, 서브 포함):\n`;
+    prompt += `\n이번 달 누적 (카테고리별, 생활비 제외 항목 표시):\n`;
     Object.entries(month.byCategory).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
       prompt += formatCatLine(cat, amt, month.bySub, true);
     });
-    prompt += `- 월 변동지출 합계: ${month.total.toLocaleString()}원\n`;
+    prompt += `- 월 생활 변동지출 합계: ${month.total.toLocaleString()}원\n`;
+    if (month.savingTotal > 0) prompt += `- 월 저금 별도: ${month.savingTotal.toLocaleString()}원\n`;
+    if (month.businessTotal > 0) prompt += `- 월 부업 지출 별도: ${month.businessTotal.toLocaleString()}원\n`;
     if (month.fixedTotal > 0) prompt += `- 월 고정지출: ${month.fixedTotal.toLocaleString()}원\n`;
     if (month.incomeTotal > 0) {
       prompt += `- 월 수입 합계: ${month.incomeTotal.toLocaleString()}원\n`;
@@ -2492,14 +2333,16 @@ function generatePrompt() {
     const now = new Date();
     
     prompt = `[쿠키 가계부 - ${now.getMonth()+1}월 마감]\n\n`;
-    prompt += `이번 달 변동지출 카테고리별 (서브 포함):\n`;
+    prompt += `이번 달 카테고리별 지출 (서브 포함, 저금/부업 별도 표시):\n`;
     if (Object.keys(month.byCategory).length === 0) {
       prompt += `- 기록 없음\n`;
     } else {
       Object.entries(month.byCategory).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
         prompt += formatCatLine(cat, amt, month.bySub, true);
       });
-      prompt += `\n월 변동지출 총: ${month.total.toLocaleString()}원\n`;
+      prompt += `\n월 생활 변동지출 총(저금·부업 제외): ${month.total.toLocaleString()}원\n`;
+      if (month.savingTotal > 0) prompt += `- 저금 별도: ${month.savingTotal.toLocaleString()}원\n`;
+      if (month.businessTotal > 0) prompt += `- 부업 지출 별도: ${month.businessTotal.toLocaleString()}원\n`;
     }
     
     if (month.fixedTotal > 0) {
@@ -2543,11 +2386,13 @@ function generatePrompt() {
     
     prompt = `[쿠키 가계부 - 지출 상담]\n\n`;
     prompt += `사고 싶은 것: ${extra}\n\n`;
-    prompt += `이번 달 현재 상황 (변동지출, 서브 포함):\n`;
+    prompt += `이번 달 현재 상황 (카테고리별, 저금/부업 별도 표시):\n`;
     Object.entries(month.byCategory).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
       prompt += formatCatLine(cat, amt, month.bySub, true);
     });
-    prompt += `- 월 변동지출: ${month.total.toLocaleString()}원\n`;
+    prompt += `- 월 생활 변동지출(저금·부업 제외): ${month.total.toLocaleString()}원\n`;
+    if (month.savingTotal > 0) prompt += `- 월 저금 별도: ${month.savingTotal.toLocaleString()}원\n`;
+    if (month.businessTotal > 0) prompt += `- 월 부업 지출 별도: ${month.businessTotal.toLocaleString()}원\n`;
     if (month.fixedTotal > 0) prompt += `- 월 고정지출: ${month.fixedTotal.toLocaleString()}원\n`;
     if (month.incomeTotal > 0) prompt += `- 월 수입: ${month.incomeTotal.toLocaleString()}원\n`;
 
@@ -2573,7 +2418,9 @@ function generatePrompt() {
       Object.entries(month.byCategory).sort((a,b)=>b[1]-a[1]).forEach(([cat, amt]) => {
         prompt += formatCatLine(cat, amt, month.bySub, false);
       });
-      prompt += `- 지출 합계: ${month.total.toLocaleString()}원\n`;
+      prompt += `- 생활 변동지출 합계(저금·부업 제외): ${month.total.toLocaleString()}원\n`;
+      if (month.savingTotal > 0) prompt += `- 저금 별도: ${month.savingTotal.toLocaleString()}원\n`;
+      if (month.businessTotal > 0) prompt += `- 부업 지출 별도: ${month.businessTotal.toLocaleString()}원\n`;
       if (month.incomeTotal > 0) prompt += `- 수입 합계: ${month.incomeTotal.toLocaleString()}원\n`;
     }
     if (asset && asset.currTotal > 0) {
